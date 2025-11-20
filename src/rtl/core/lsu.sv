@@ -1,3 +1,5 @@
+`include "types.svh"
+
 module lsu(
     input  lsuCtrl_e     lsu_ctrl,
     input  logic [31:0]  addr,

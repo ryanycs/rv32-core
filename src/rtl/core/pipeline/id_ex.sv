@@ -1,3 +1,5 @@
+`include "types.svh"
+
 module id_ex(
     input  logic  clk,
     input  logic  rst,

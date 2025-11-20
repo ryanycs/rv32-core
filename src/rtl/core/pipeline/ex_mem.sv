@@ -1,3 +1,5 @@
+`include "types.svh"
+
 module ex_mem(
     input  logic  clk,
     input  logic  rst,

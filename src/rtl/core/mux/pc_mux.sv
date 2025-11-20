@@ -1,3 +1,5 @@
+`include "types.svh"
+
 module pc_mux(
     input  logic [31:0]  alu_result,
     input  logic [31:0]  pc_plus_4,

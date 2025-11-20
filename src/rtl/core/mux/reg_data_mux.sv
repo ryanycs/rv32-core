@@ -1,3 +1,5 @@
+`include "types.svh"
+
 module reg_data_mux (
     input  logic [31:0]  rd_data_ex,
     input  logic [31:0]  alu_result_mem,
