@@ -62,7 +62,7 @@ logic [31:0] pc_id;
 logic [31:0] pc_plus_4_id;
 logic [31:0] inst_id;
 
-// Register addresses
+// Register addr
 logic [4:0]  rd_id;
 logic [4:0]  rs1_id;
 logic [4:0]  rs2_id;
@@ -76,12 +76,12 @@ immType_e    imm_type_id;
 logic [31:0] imm_id;
 
 `ifdef Zicsr_EXT
-// CSR signals
+// CSR signal
 logic [11:0] csr_addr_id;
 logic        csr_instret_inc_id;
 `endif
 
-// Control signals
+// Control signal
 opcodeType_e opcode_type_id;
 logic        reg_wr_en_id;
 logic        mem_wr_en_id;
@@ -100,7 +100,7 @@ resultSrc_e  result_src_id;
 logic [31:0] pc_ex;
 logic [31:0] pc_plus_4_ex;
 
-// Register addresses
+// Register addr
 logic [4:0]  rd_ex;
 logic [4:0]  rs1_ex;
 logic [4:0]  rs2_ex;
@@ -116,19 +116,19 @@ logic [31:0] imm_ex;
 logic [31:0] rs1_data_mux_out;
 logic [31:0] rs2_data_mux_out;
 
-// ALU signals
+// ALU signal
 logic [31:0] alu_a;
 logic [31:0] alu_b;
 logic [31:0] alu_result_ex;
 
 `ifdef Zicsr_EXT
-// CSR signals
+// CSR signal
 logic [11:0] csr_addr_ex;
 logic        csr_instret_inc_ex;
 logic [31:0] csr_rd_data_ex;
 `endif
 
-// Control signals
+// Control signal
 logic        reg_wr_en_ex;
 logic        mem_wr_en_ex;
 aluCtrl_e    alu_ctrl_ex;
@@ -153,14 +153,14 @@ logic [31:0] rs2_data_mem;
 logic [31:0] alu_result_mem;
 logic [31:0] mem_rd_data_mem;
 
-// Control signals
+// Control signal
 logic        reg_wr_en_mem;
 logic        mem_wr_en_mem;
 lsuCtrl_e    lsu_ctrl_mem;
 resultSrc_e  result_src_mem;
 
 `ifdef Zicsr_EXT
-// CSR signals
+// CSR signal
 logic [31:0] csr_rd_data_mem;
 `endif
 
@@ -177,12 +177,12 @@ logic [31:0] alu_result_wb;
 logic [31:0] mem_rd_data_wb;
 logic [31:0] result_wb;
 
-// Control signals
+// Control signal
 logic        reg_wr_en_wb;
 resultSrc_e  result_src_wb;
 
 `ifdef Zicsr_EXT
-// CSR signals
+// CSR signal
 logic [31:0] csr_rd_data_wb;
 `endif
 
@@ -240,14 +240,20 @@ if_id u_if_id(
     .inst_out      (inst_id)
 );
 
+// PC select:
+//   - ALU_RESULT: if jump or branch taken in EX
+//   - PC + 4: otherwise
 assign pc_sel = (jump_ex | (branch_ex & branch_taken))
                 ? PC_SRC_ALU_RESULT : PC_SRC_PC_PLUS_4;
 
+// Mux for next PC:
+//   - ALU result (branch/jump target in EX)
+//   - PC + 4 (IF)
 pc_mux u_pc_mux(
-    .alu_result (alu_result_ex),  // From EX stage for branch/jump target
-    .pc_plus_4  (pc_plus_4_if),   // From IF stage
-    .pc_sel     (pc_sel),         // Select signal
-    .pc_out     (pc_next)         // Next PC
+    .alu_result (alu_result_ex),
+    .pc_plus_4  (pc_plus_4_if),
+    .pc_sel     (pc_sel),
+    .pc_out     (pc_next)
 );
 
 `ifdef DEBUG
@@ -270,18 +276,18 @@ decoder u_decoder(
     .rs1         (rs1_id),
     .rs2         (rs2_id),
     .rd          (rd_id),
-    `ifdef Zicsr_EXT
+`ifdef Zicsr_EXT
     .csr_addr    (csr_addr_id),
-    `endif
+`endif
 
-    .imm_type    (imm_type_id),    // Immediate type
-    .opcode_type (opcode_type_id)  // Instruction type
+    .imm_type    (imm_type_id),
+    .opcode_type (opcode_type_id)
 );
 
 imm_gen u_imm_gen(
-    .inst     (inst_id),      // Instruction
-    .imm_type (imm_type_id),  // Immediate type
-    .imm      (imm_id)        // Immediate output
+    .inst     (inst_id),
+    .imm_type (imm_type_id),
+    .imm      (imm_id)
 );
 
 control_unit u_control(
@@ -297,12 +303,13 @@ control_unit u_control(
     .lsu_ctrl    (lsu_ctrl_id),     // Load/Store unit control
     .result_src  (result_src_id)    // Result source select
 
-    `ifdef Zicsr_EXT
+`ifdef Zicsr_EXT
     ,
     .csr_instret_inc (csr_instret_inc_id)
-    `endif
+`endif
 );
 
+// Register File
 reg_file u_reg_file(
     .clk      (clk),
     .rst      (rst),
@@ -358,55 +365,65 @@ id_ex u_id_ex(
     .rs2_out         (rs2_ex),
     .rd_out          (rd_ex)
 
-    `ifdef Zicsr_EXT
+`ifdef Zicsr_EXT
     ,
     .csr_instret_inc_in  (csr_instret_inc_id),
     .csr_addr_in         (csr_addr_id),
     .csr_instret_inc_out (csr_instret_inc_ex),
     .csr_addr_out        (csr_addr_ex)
-    `endif
+`endif
 
-    `ifdef DEBUG
+`ifdef DEBUG
     ,
     .opcode_type_in  (opcode_type_id),
     .opcode_type_out (opcode_type_ex)
-    `endif
+`endif
 );
 
 ////////////////////////////////////////////////////////////////////////////////
 // Execute
 ////////////////////////////////////////////////////////////////////////////////
 
+// Mux for forwarding rs1 data:
+//   - rs1 (EX)
+//   - ALU result (MEM)
+//   - write-back data (WB)
 reg_data_mux u_rs1_data_mux(
     .rd_data_ex     (rs1_data_ex),
     .alu_result_mem (alu_result_mem),
     .result_wb      (result_wb),
-
     .forward_sel    (forward_a),
-
     .rd_data_out    (rs1_data_mux_out)
 );
 
+// Mux for ALU operand a:
+//   - PC
+//   - rs1
 mux2 u_alu_src1_mux(
-    .in0 (pc_ex),
-    .in1 (rs1_data_mux_out),
+    .in1 (pc_ex),
+    .in2 (rs1_data_mux_out),
     .sel (alu_src1_ex),
     .out (alu_a)
 );
 
+// Mux for forwarding rs2 data:
+//   - rs2 (EX)
+//   - ALU result (MEM)
+//   - write-back data (WB)
 reg_data_mux u_rs2_data_mux(
     .rd_data_ex     (rs2_data_ex),
     .alu_result_mem (alu_result_mem),
     .result_wb      (result_wb),
-
     .forward_sel    (forward_b),
-
     .rd_data_out    (rs2_data_mux_out)
 );
 
+// Mux for ALU operand b:
+//   - rs2
+//   - immediate
 mux2 u_alu_src2_mux(
-    .in0 (rs2_data_mux_out),
-    .in1 (imm_ex),
+    .in1 (rs2_data_mux_out),
+    .in2 (imm_ex),
     .sel (alu_src2_ex),
     .out (alu_b)
 );
@@ -481,17 +498,17 @@ ex_mem u_ex_mem(
     .rs2_data_out   (rs2_data_mem),
     .rd_out         (rd_mem)
 
-    `ifdef Zicsr_EXT
+`ifdef Zicsr_EXT
     ,
-    .csr_rd_data_in      (csr_rd_data_ex),
-    .csr_rd_data_out     (csr_rd_data_mem)
-    `endif
+    .csr_rd_data_in  (csr_rd_data_ex),
+    .csr_rd_data_out (csr_rd_data_mem)
+`endif
 
-    `ifdef DEBUG
+`ifdef DEBUG
     ,
     .opcode_type_in  (opcode_type_ex),
     .opcode_type_out (opcode_type_mem)
-    `endif
+`endif
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -530,34 +547,36 @@ mem_wb u_mem_wb(
     .rd_out          (rd_wb),
     .pc_plus_4_out   (pc_plus_4_wb)
 
-    `ifdef Zicsr_EXT
+`ifdef Zicsr_EXT
     ,
     .csr_rd_data_in      (csr_rd_data_mem),
     .csr_rd_data_out     (csr_rd_data_wb)
-    `endif
+`endif
 
-    `ifdef DEBUG
+`ifdef DEBUG
     ,
     .opcode_type_in  (opcode_type_mem),
     .opcode_type_out (opcode_type_wb)
-    `endif
+`endif
 );
 
 ////////////////////////////////////////////////////////////////////////////////
 // Write Back
 ////////////////////////////////////////////////////////////////////////////////
 
+// Mux for write-back data:
+//   - PC + 4 (for JAL/JALR)
+//   - ALU result
+//   - Memory read data
+//   - CSR read data (if Zicsr is enabled)
 result_mux u_result_mux(
     .pc_plus_4   (pc_plus_4_wb),
     .alu_result  (alu_result_wb),
     .mem_rd_data (mem_rd_data_wb),
-
-    `ifdef Zicsr_EXT
+`ifdef Zicsr_EXT
     .csr_rd_data (csr_rd_data_wb),
-    `endif
-
+`endif
     .result_sel  (result_src_wb),
-
     .result_out  (result_wb)
 );
 

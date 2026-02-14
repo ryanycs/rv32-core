@@ -139,4 +139,4 @@ typedef enum logic [11:0] {
 } csrAddr_e;
 `endif
 
-`endif
+`endif // TYPES_SVH
