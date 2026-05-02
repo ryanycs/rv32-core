@@ -36,18 +36,15 @@ typedef enum logic [5:0] {
     // B-Type (6 ops)
     BEQ, BNE, BLT, BGE, BLTU, BGEU,
 
-`ifdef M_EXT
+    // M Extension
     MUL, MULH, MULHSU, MULHU,
-`endif
 
-`ifdef F_EXT
+    // F Extension
     FLW, FSW,
     FADD, FSUB,
-`endif
 
-`ifdef Zicsr_EXT
+    // Zicsr Extension
     CSRRS,
-`endif
 
     NOP // Note: This is not a real opcode, just a placeholder
 } opcodeType_e;
@@ -121,22 +118,16 @@ typedef enum logic {
 typedef enum logic [1:0] {
     RESULT_SRC_ALU,
     RESULT_SRC_MEM,
-    RESULT_SRC_PC_PLUS_4
-
-    `ifdef Zicsr_EXT
-    ,
+    RESULT_SRC_PC_PLUS_4,
     RESULT_SRC_CSR
-    `endif
 } resultSrc_e;
 
 
-`ifdef Zicsr_EXT
 typedef enum logic [11:0] {
     CSR_CYCLE    = 12'hC00,
     CSR_CYCLEH   = 12'hC80,
     CSR_INSTRET  = 12'hC02,
     CSR_INSTRETH = 12'hC82
 } csrAddr_e;
-`endif
 
 `endif // TYPES_SVH

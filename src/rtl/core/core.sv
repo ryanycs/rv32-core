@@ -2,382 +2,300 @@
 
 `include "alu.sv"
 `include "branch_comp.sv"
-`include "control_unit.sv"
+`include "control.sv"
+`include "csr.sv"
 `include "decoder.sv"
-`include "forwarding_unit.sv"
-`include "hazard_unit.sv"
+`include "reg_ex_mem.sv"
+`include "forwarding.sv"
+`include "hazard.sv"
+`include "reg_id_ex.sv"
+`include "reg_if_id.sv"
 `include "imm_gen.sv"
 `include "lsu.sv"
-// `include "branch_predictor.sv" /* TODO */
-// `include "fpu.sv"              /* TODO */
-// `include "mul.sv"              /* TODO */
-`include "program_counter.sv"
-`include "reg_file.sv"
-`include "mux/mux2.sv"
-`include "mux/pc_mux.sv"
-`include "mux/reg_data_mux.sv"
-`include "mux/result_mux.sv"
-`include "pipeline/if_id.sv"
-`include "pipeline/id_ex.sv"
-`include "pipeline/ex_mem.sv"
-`include "pipeline/mem_wb.sv"
-// `include "fp_reg_file.sv"      /* TODO */
-
-`ifdef Zicsr_EXT
-`include "csr.sv"
-`endif
+`include "reg_mem_wb.sv"
+`include "pc.sv"
+`include "regfile.sv"
 
 module core(
-    input  logic clk,
-    input  logic rst,
-
-    input  logic [31:0] imem_rd_data,
-    input  logic [31:0] dmem_rd_data,
+    input  logic        clk,
+    input  logic        rst,
 
     output logic [31:0] imem_addr,
+    input  logic [31:0] imem_rdata,
 
-    output logic        dmem_wr_en,
-    output logic [31:0] dmem_bit_wr_en,
+    output logic        dmem_wen,
+    output logic [31:0] dmem_bwe,
     output logic [31:0] dmem_addr,
-    output logic [31:0] dmem_wr_data
+    output logic [31:0] dmem_wdata,
+    input  logic [31:0] dmem_rdata
 );
 
+// {{{ Wire declaration
 ////////////////////////////////////////
 // IF stage
 ////////////////////////////////////////
 pcSrc_e      pc_sel;
 logic [31:0] pc_next;
-logic [31:0] pc_if;
-logic [31:0] pc_plus_4_if;
-logic [31:0] inst_if;
-
-`ifdef DEBUG
-opcodeType_e opcode_type_if;
-`endif
+logic [31:0] if_pc;
+logic [31:0] if_pc_plus_4;
+logic [31:0] if_inst;
 
 ////////////////////////////////////////
 // ID stage
 ////////////////////////////////////////
-logic [31:0] pc_id;
-logic [31:0] pc_plus_4_id;
-logic [31:0] inst_id;
-
+logic [31:0] id_pc;
+logic [31:0] id_pc_plus_4;
+logic [31:0] id_inst;
 // Register addr
-logic [4:0]  rd_id;
-logic [4:0]  rs1_id;
-logic [4:0]  rs2_id;
-
+logic [4:0]  id_rd_addr;
+logic [4:0]  id_rs1_addr;
+logic [4:0]  id_rs2_addr;
 // Register read data
-logic [31:0] rs1_data_id;
-logic [31:0] rs2_data_id;
-
+logic [31:0] id_rs1_data;
+logic [31:0] id_rs2_data;
 // Immediate generator
-immType_e    imm_type_id;
-logic [31:0] imm_id;
-
-`ifdef Zicsr_EXT
+immType_e    id_imm_type;
+logic [31:0] id_imm;
 // CSR signal
-logic [11:0] csr_addr_id;
-logic        csr_instret_inc_id;
-`endif
-
+logic [11:0] id_csr_addr;
+logic        id_csr_instret_inc;
 // Control signal
-opcodeType_e opcode_type_id;
-logic        reg_wr_en_id;
-logic        mem_wr_en_id;
-aluCtrl_e    alu_ctrl_id;
-logic        jump_id;
-logic        branch_id;
-branchCtrl_e branch_ctrl_id;
-aluSrc1_e    alu_src1_id;
-aluSrc2_e    alu_src2_id;
-lsuCtrl_e    lsu_ctrl_id;
-resultSrc_e  result_src_id;
+opcodeType_e id_opcode_type;
+logic        id_reg_wen;
+logic        id_mem_wen;
+aluCtrl_e    id_alu_ctrl;
+logic        id_jump;
+logic        id_branch;
+branchCtrl_e id_branch_ctrl;
+aluSrc1_e    id_alu_src1;
+aluSrc2_e    id_alu_src2;
+lsuCtrl_e    id_lsu_ctrl;
+resultSrc_e  id_result_src;
 
 ////////////////////////////////////////
 // EX stage
 ////////////////////////////////////////
-logic [31:0] pc_ex;
-logic [31:0] pc_plus_4_ex;
-
+logic [31:0] ex_pc;
+logic [31:0] ex_pc_plus_4;
 // Register addr
-logic [4:0]  rd_ex;
-logic [4:0]  rs1_ex;
-logic [4:0]  rs2_ex;
-
+logic [4:0]  ex_rd_addr;
+logic [4:0]  ex_rs1_addr;
+logic [4:0]  ex_rs2_addr;
 // Register data
-logic [31:0] rs1_data_ex;
-logic [31:0] rs2_data_ex;
-
+logic [31:0] ex_rs1_data;
+logic [31:0] ex_rs2_data;
 // Immediate
-logic [31:0] imm_ex;
-
+logic [31:0] ex_imm;
 // Forwarded register data
-logic [31:0] rs1_data_mux_out;
-logic [31:0] rs2_data_mux_out;
-
+logic [31:0] ex_rs1_data_fwd;
+logic [31:0] ex_rs2_data_fwd;
 // ALU signal
-logic [31:0] alu_a;
-logic [31:0] alu_b;
-logic [31:0] alu_result_ex;
-
-`ifdef Zicsr_EXT
+logic [31:0] ex_alu_a;
+logic [31:0] ex_alu_b;
+logic [31:0] ex_alu_result;
 // CSR signal
-logic [11:0] csr_addr_ex;
-logic        csr_instret_inc_ex;
-logic [31:0] csr_rd_data_ex;
-`endif
-
+logic [11:0] ex_csr_addr;
+logic        ex_csr_instret_inc;
+logic [31:0] ex_csr_rdata;
 // Control signal
-logic        reg_wr_en_ex;
-logic        mem_wr_en_ex;
-aluCtrl_e    alu_ctrl_ex;
-logic        jump_ex;
-logic        branch_ex;
-branchCtrl_e branch_ctrl_ex;
-aluSrc1_e    alu_src1_ex;
-aluSrc2_e    alu_src2_ex;
-lsuCtrl_e    lsu_ctrl_ex;
-resultSrc_e  result_src_ex;
-
-`ifdef DEBUG
-opcodeType_e opcode_type_ex;
-`endif
+logic        ex_reg_wen;
+logic        ex_mem_wen;
+aluCtrl_e    ex_alu_ctrl;
+logic        ex_jump;
+logic        ex_branch;
+branchCtrl_e ex_branch_ctrl;
+aluSrc1_e    ex_alu_src1;
+aluSrc2_e    ex_alu_src2;
+lsuCtrl_e    ex_lsu_ctrl;
+resultSrc_e  ex_result_src;
 
 ////////////////////////////////////////
 // MEM stage
 ////////////////////////////////////////
-logic [31:0] pc_plus_4_mem;
-logic [4:0]  rd_mem;
-logic [31:0] rs2_data_mem;
-logic [31:0] alu_result_mem;
-logic [31:0] mem_rd_data_mem;
-
+logic [31:0] mem_pc_plus_4;
+logic [4:0]  mem_rd_addr;
+logic [31:0] mem_rs2_data;
+logic [31:0] mem_alu_result;
+logic [31:0] mem_mem_rdata;
 // Control signal
-logic        reg_wr_en_mem;
-logic        mem_wr_en_mem;
-lsuCtrl_e    lsu_ctrl_mem;
-resultSrc_e  result_src_mem;
-
-`ifdef Zicsr_EXT
+logic        mem_reg_wen;
+logic        mem_mem_wen;
+lsuCtrl_e    mem_lsu_ctrl;
+resultSrc_e  mem_result_src;
 // CSR signal
-logic [31:0] csr_rd_data_mem;
-`endif
-
-`ifdef DEBUG
-opcodeType_e opcode_type_mem;
-`endif
+logic [31:0] mem_csr_rdata;
 
 ////////////////////////////////////////
 // WB stage
 ////////////////////////////////////////
-logic [31:0] pc_plus_4_wb;
-logic [4:0]  rd_wb;
-logic [31:0] alu_result_wb;
-logic [31:0] mem_rd_data_wb;
-logic [31:0] result_wb;
-
+logic [31:0] wb_pc_plus_4;
+logic [4:0]  wb_rd_addr;
+logic [31:0] wb_alu_result;
+logic [31:0] wb_mem_rdata;
+logic [31:0] wb_result;
 // Control signal
-logic        reg_wr_en_wb;
-resultSrc_e  result_src_wb;
-
-`ifdef Zicsr_EXT
+logic        wb_reg_wen;
+resultSrc_e  wb_result_src;
 // CSR signal
-logic [31:0] csr_rd_data_wb;
-`endif
-
-`ifdef DEBUG
-opcodeType_e opcode_type_wb;
-`endif
+logic [31:0] wb_csr_rdata;
 
 ////////////////////////////////////////
 // Branch & Hazard signals
 ////////////////////////////////////////
 // Branch signal
 logic branch_taken;
-
 // Forwarding signals
 forwardCtrl_e forward_a;
 forwardCtrl_e forward_b;
-
 // Hazard signals
 logic stall_pc;
 logic stall_if_id;
 logic flush_if_id;
 logic flush_id_ex;
+// }}}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Instruction Fetch
 ////////////////////////////////////////////////////////////////////////////////
 
-// PC Register
-program_counter u_pc(
-    .clk    (clk),
-    .rst    (rst),
-    .en     (stall_pc),
-
-    .pc_in  (pc_next),
-    .pc_out (pc_if)
+// PC
+pc u_pc(
+    .clk  (clk),
+    .rst  (rst),
+    .stall(stall_pc),
+    .pc_i (pc_next),
+    .pc_o (if_pc)
 );
 
-assign pc_plus_4_if = pc_if + 32'd4;
-assign imem_addr    = pc_if;
-assign inst_if      = imem_rd_data;
+assign if_pc_plus_4 = if_pc + 32'd4;
+assign imem_addr = if_pc;
+assign if_inst = imem_rdata;
 
 // Pipeline Register IF/ID
-if_id u_if_id(
-    .clk           (clk),
-    .rst           (rst),
-    .clear         (flush_if_id),   // 1 to clear
-    .en            (stall_if_id),   // 1 to enable
-
-    .pc_in         (pc_if),
-    .pc_plus_4_in  (pc_plus_4_if),
-    .inst_in       (inst_if),
-
-    .pc_out        (pc_id),
-    .pc_plus_4_out (pc_plus_4_id),
-    .inst_out      (inst_id)
+reg_if_id u_if_id(
+    .clk        (clk),
+    .rst        (rst),
+    .stall      (stall_if_id),
+    .flush      (flush_if_id),
+    .pc_i       (if_pc),
+    .pc_plus_4_i(if_pc_plus_4),
+    .inst_i     (if_inst),
+    .pc_o       (id_pc),
+    .pc_plus_4_o(id_pc_plus_4),
+    .inst_o     (id_inst)
 );
 
 // PC select:
 //   - ALU_RESULT: if jump or branch taken in EX
 //   - PC + 4: otherwise
-assign pc_sel = (jump_ex | (branch_ex & branch_taken))
+assign pc_sel = (ex_jump | (ex_branch & branch_taken))
                 ? PC_SRC_ALU_RESULT : PC_SRC_PC_PLUS_4;
 
 // Mux for next PC:
 //   - ALU result (branch/jump target in EX)
 //   - PC + 4 (IF)
-pc_mux u_pc_mux(
-    .alu_result (alu_result_ex),
-    .pc_plus_4  (pc_plus_4_if),
-    .pc_sel     (pc_sel),
-    .pc_out     (pc_next)
-);
+always_comb begin
+    if (pc_sel == PC_SRC_ALU_RESULT) begin
+        pc_next = ex_alu_result & 32'hFFFFFFFE; // Ensure LSB is 0
+    end else begin
+        pc_next = if_pc_plus_4;
+    end
+end
 
-`ifdef DEBUG
-decoder u_decoder_debug(
-    .inst        (inst_if),        // Instruction
-    .rs1         (),
-    .rs2         (),
-    .rd          (),
-    .imm_type    (),
-    .opcode_type (opcode_type_if)  // Instruction type
-);
-`endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Instruction Decode
 ////////////////////////////////////////////////////////////////////////////////
 
-decoder u_decoder(
-    .inst        (inst_id),        // Instruction
-    .rs1         (rs1_id),
-    .rs2         (rs2_id),
-    .rd          (rd_id),
-`ifdef Zicsr_EXT
-    .csr_addr    (csr_addr_id),
-`endif
+// assign id_inst = imem_rdata;
 
-    .imm_type    (imm_type_id),
-    .opcode_type (opcode_type_id)
+decoder u_decoder(
+    .inst_i       (id_inst),
+    .rs1_addr_o   (id_rs1_addr),
+    .rs2_addr_o   (id_rs2_addr),
+    .rd_addr_o    (id_rd_addr),
+    .csr_addr_o   (id_csr_addr),
+    .imm_type_o   (id_imm_type),
+    .opcode_type_o(id_opcode_type)
 );
 
 imm_gen u_imm_gen(
-    .inst     (inst_id),
-    .imm_type (imm_type_id),
-    .imm      (imm_id)
+    .inst_i    (id_inst),
+    .imm_type_i(id_imm_type),
+    .imm_o     (id_imm)
 );
 
-control_unit u_control(
-    .opcode_type (opcode_type_id),  // Instruction type
-    .reg_wr_en   (reg_wr_en_id),    // Register write enable
-    .mem_wr_en   (mem_wr_en_id),    // Memory write enable
-    .jump        (jump_id),         // Jump signal
-    .branch      (branch_id),       // Branch signal
-    .branch_ctrl (branch_ctrl_id),  // Branch control (BEQ, BNE, etc.)
-    .alu_ctrl    (alu_ctrl_id),     // ALU control signal (ADD, SUB, etc.)
-    .alu_src1    (alu_src1_id),     // ALU source 1 select
-    .alu_src2    (alu_src2_id),     // ALU source 2 select
-    .lsu_ctrl    (lsu_ctrl_id),     // Load/Store unit control
-    .result_src  (result_src_id)    // Result source select
-
-`ifdef Zicsr_EXT
-    ,
-    .csr_instret_inc (csr_instret_inc_id)
-`endif
+control u_control(
+    .opcode_type_i    (id_opcode_type),
+    .reg_wen_o        (id_reg_wen),
+    .mem_wen_o        (id_mem_wen),
+    .jump_o           (id_jump),
+    .branch_o         (id_branch),
+    .branch_ctrl_o    (id_branch_ctrl),
+    .alu_ctrl_o       (id_alu_ctrl),
+    .alu_src1_o       (id_alu_src1),
+    .alu_src2_o       (id_alu_src2),
+    .lsu_ctrl_o       (id_lsu_ctrl),
+    .result_src_o     (id_result_src),
+    .csr_instret_inc_o(id_csr_instret_inc)
 );
 
-// Register File
-reg_file u_reg_file(
-    .clk      (clk),
-    .rst      (rst),
-    .rs1      (rs1_id),
-    .rs2      (rs2_id),
-    .rs1_data (rs1_data_id),
-    .rs2_data (rs2_data_id),
-    .wr_en    (reg_wr_en_wb),
-    .wr_addr  (rd_wb),
-    .wr_data  (result_wb)
+regfile u_regfile(
+    .clk       (clk),
+    .rst       (rst),
+    .rs1_addr_i(id_rs1_addr),
+    .rs2_addr_i(id_rs2_addr),
+    .wen_i     (wb_reg_wen),
+    .waddr_i   (wb_rd_addr),
+    .wdata_i   (wb_result),
+    .rs1_data_o(id_rs1_data),
+    .rs2_data_o(id_rs2_data)
 );
 
-id_ex u_id_ex(
-    .clk             (clk),
-    .rst             (rst),
-    .clear           (flush_id_ex),
-
-    .reg_wr_en_in    (reg_wr_en_id),
-    .mem_wr_en_in    (mem_wr_en_id),
-    .jump_in         (jump_id),
-    .branch_in       (branch_id),
-    .branch_ctrl_in  (branch_ctrl_id),
-    .alu_ctrl_in     (alu_ctrl_id),
-    .alu_src1_in     (alu_src1_id),
-    .alu_src2_in     (alu_src2_id),
-    .lsu_ctrl_in     (lsu_ctrl_id),
-    .result_src_in   (result_src_id),
-    .pc_in           (pc_id),
-    .pc_plus_4_in    (pc_plus_4_id),
-    .rs1_data_in     (rs1_data_id),
-    .rs2_data_in     (rs2_data_id),
-    .imm_in          (imm_id),
-    .rs1_in          (rs1_id),
-    .rs2_in          (rs2_id),
-    .rd_in           (rd_id),
-
-    .reg_wr_en_out   (reg_wr_en_ex),
-    .mem_wr_en_out   (mem_wr_en_ex),
-    .jump_out        (jump_ex),
-    .branch_out      (branch_ex),
-    .branch_ctrl_out (branch_ctrl_ex),
-    .alu_ctrl_out    (alu_ctrl_ex),
-    .alu_src1_out    (alu_src1_ex),
-    .alu_src2_out    (alu_src2_ex),
-    .lsu_ctrl_out    (lsu_ctrl_ex),
-    .result_src_out  (result_src_ex),
-    .pc_out          (pc_ex),
-    .pc_plus_4_out   (pc_plus_4_ex),
-    .rs1_data_out    (rs1_data_ex),
-    .rs2_data_out    (rs2_data_ex),
-    .imm_out         (imm_ex),
-    .rs1_out         (rs1_ex),
-    .rs2_out         (rs2_ex),
-    .rd_out          (rd_ex)
-
-`ifdef Zicsr_EXT
-    ,
-    .csr_instret_inc_in  (csr_instret_inc_id),
-    .csr_addr_in         (csr_addr_id),
-    .csr_instret_inc_out (csr_instret_inc_ex),
-    .csr_addr_out        (csr_addr_ex)
-`endif
-
-`ifdef DEBUG
-    ,
-    .opcode_type_in  (opcode_type_id),
-    .opcode_type_out (opcode_type_ex)
-`endif
+reg_id_ex u_id_ex(
+    .clk              (clk),
+    .rst              (rst),
+    .flush            (flush_id_ex),
+    .reg_wen_i        (id_reg_wen),
+    .mem_wen_i        (id_mem_wen),
+    .jump_i           (id_jump),
+    .branch_i         (id_branch),
+    .branch_ctrl_i    (id_branch_ctrl),
+    .alu_ctrl_i       (id_alu_ctrl),
+    .alu_src1_i       (id_alu_src1),
+    .alu_src2_i       (id_alu_src2),
+    .lsu_ctrl_i       (id_lsu_ctrl),
+    .result_src_i     (id_result_src),
+    .pc_i             (id_pc),
+    .pc_plus_4_i      (id_pc_plus_4),
+    .rs1_data_i       (id_rs1_data),
+    .rs2_data_i       (id_rs2_data),
+    .imm_i            (id_imm),
+    .rs1_addr_i       (id_rs1_addr),
+    .rs2_addr_i       (id_rs2_addr),
+    .rd_addr_i        (id_rd_addr),
+    .csr_instret_inc_i(id_csr_instret_inc),
+    .csr_addr_i       (id_csr_addr),
+    .reg_wen_o        (ex_reg_wen),
+    .mem_wen_o        (ex_mem_wen),
+    .jump_o           (ex_jump),
+    .branch_o         (ex_branch),
+    .branch_ctrl_o    (ex_branch_ctrl),
+    .alu_ctrl_o       (ex_alu_ctrl),
+    .alu_src1_o       (ex_alu_src1),
+    .alu_src2_o       (ex_alu_src2),
+    .lsu_ctrl_o       (ex_lsu_ctrl),
+    .result_src_o     (ex_result_src),
+    .pc_o             (ex_pc),
+    .pc_plus_4_o      (ex_pc_plus_4),
+    .rs1_data_o       (ex_rs1_data),
+    .rs2_data_o       (ex_rs2_data),
+    .imm_o            (ex_imm),
+    .rs1_addr_o       (ex_rs1_addr),
+    .rs2_addr_o       (ex_rs2_addr),
+    .rd_addr_o        (ex_rd_addr),
+    .csr_instret_inc_o(ex_csr_instret_inc),
+    .csr_addr_o       (ex_csr_addr)
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -388,177 +306,171 @@ id_ex u_id_ex(
 //   - rs1 (EX)
 //   - ALU result (MEM)
 //   - write-back data (WB)
-reg_data_mux u_rs1_data_mux(
-    .rd_data_ex     (rs1_data_ex),
-    .alu_result_mem (alu_result_mem),
-    .result_wb      (result_wb),
-    .forward_sel    (forward_a),
-    .rd_data_out    (rs1_data_mux_out)
-);
+always_comb begin
+    case (forward_a)
+        FORWARD_NONE: begin
+            ex_rs1_data_fwd = ex_rs1_data;
+        end
+        FORWARD_FROM_MEM: begin
+            ex_rs1_data_fwd = mem_alu_result;
+        end
+        FORWARD_FROM_WB: begin
+            ex_rs1_data_fwd = wb_result;
+        end
+        default: begin
+            ex_rs1_data_fwd = ex_rs1_data;
+        end
+    endcase
+end
 
 // Mux for ALU operand a:
 //   - PC
 //   - rs1
-mux2 u_alu_src1_mux(
-    .in1 (pc_ex),
-    .in2 (rs1_data_mux_out),
-    .sel (alu_src1_ex),
-    .out (alu_a)
-);
+always_comb begin
+    if (ex_alu_src1) begin
+        ex_alu_a = ex_rs1_data_fwd;
+    end else begin
+        ex_alu_a = ex_pc;
+    end
+end
 
 // Mux for forwarding rs2 data:
 //   - rs2 (EX)
 //   - ALU result (MEM)
 //   - write-back data (WB)
-reg_data_mux u_rs2_data_mux(
-    .rd_data_ex     (rs2_data_ex),
-    .alu_result_mem (alu_result_mem),
-    .result_wb      (result_wb),
-    .forward_sel    (forward_b),
-    .rd_data_out    (rs2_data_mux_out)
-);
+always_comb begin
+    case (forward_b)
+        FORWARD_NONE: begin
+            ex_rs2_data_fwd = ex_rs2_data;
+        end
+        FORWARD_FROM_MEM: begin
+            ex_rs2_data_fwd = mem_alu_result;
+        end
+        FORWARD_FROM_WB: begin
+            ex_rs2_data_fwd = wb_result;
+        end
+        default: begin
+            ex_rs2_data_fwd = ex_rs2_data;
+        end
+    endcase
+end
 
 // Mux for ALU operand b:
 //   - rs2
 //   - immediate
-mux2 u_alu_src2_mux(
-    .in1 (rs2_data_mux_out),
-    .in2 (imm_ex),
-    .sel (alu_src2_ex),
-    .out (alu_b)
-);
+always_comb begin
+    if (ex_alu_src2) begin
+        ex_alu_b = ex_imm;
+    end else begin
+        ex_alu_b = ex_rs2_data_fwd;
+    end
+end
 
 alu u_alu(
-    .a          (alu_a),
-    .b          (alu_b),
-    .alu_ctrl   (alu_ctrl_ex),
-    .alu_result (alu_result_ex)
+    .a_i   (ex_alu_a),
+    .b_i   (ex_alu_b),
+    .ctrl_i(ex_alu_ctrl),
+    .res_o (ex_alu_result)
 );
 
 branch_comp u_branch_comp(
-    .a            (rs1_data_mux_out),
-    .b            (rs2_data_mux_out),
-    .branch_ctrl  (branch_ctrl_ex),
-    .branch_taken (branch_taken)
+    .a_i           (ex_rs1_data_fwd),
+    .b_i           (ex_rs2_data_fwd),
+    .ctrl_i        (ex_branch_ctrl),
+    .branch_taken_o(branch_taken)
 );
 
-forwarding_unit u_forwarding(
-    .rs1_ex        (rs1_ex),
-    .rs2_ex        (rs2_ex),
-    .rd_mem        (rd_mem),
-    .rd_wb         (rd_wb),
-    .reg_wr_en_mem (reg_wr_en_mem),
-    .reg_wr_en_wb  (reg_wr_en_wb),
-    .forward_a     (forward_a),
-    .forward_b     (forward_b)
+forwarding u_forwarding(
+    .rs1_addr_ex_i(ex_rs1_addr),
+    .rs2_addr_ex_i(ex_rs2_addr),
+    .rd_addr_mem_i(mem_rd_addr),
+    .rd_addr_wb_i (wb_rd_addr),
+    .reg_wen_mem_i(mem_reg_wen),
+    .reg_wen_wb_i (wb_reg_wen),
+    .forward_a_o  (forward_a),
+    .forward_b_o  (forward_b)
 );
 
-hazard_unit u_hazard(
-    .rs1_id        (rs1_id),
-    .rs2_id        (rs2_id),
-    .rd_ex         (rd_ex),
-    .result_src_ex (result_src_ex),
-    .pc_sel        (pc_sel),
-
-    .stall_pc      (stall_pc),
-    .stall_if_id   (stall_if_id),
-    .flush_if_id   (flush_if_id),
-    .flush_id_ex   (flush_id_ex)
+hazard u_hazard(
+    .id_rs1_addr_i  (id_rs1_addr),
+    .id_rs2_addr_i  (id_rs2_addr),
+    .ex_rd_addr_i   (ex_rd_addr),
+    .ex_result_src_i(ex_result_src),
+    .pc_sel_i       (pc_sel),
+    .stall_pc_o     (stall_pc),
+    .stall_if_id_o  (stall_if_id),
+    .flush_if_id_o  (flush_if_id),
+    .flush_id_ex_o  (flush_id_ex)
 );
 
-`ifdef Zicsr_EXT
 csr u_csr(
-    .clk             (clk),
-    .rst             (rst),
-    .csr_instret_inc (csr_instret_inc_ex),
-    .csr_addr        (csr_addr_ex),
-    .csr_rd_data     (csr_rd_data_ex)
+    .clk              (clk),
+    .rst              (rst),
+    .csr_instret_inc_i(ex_csr_instret_inc),
+    .csr_addr_i       (ex_csr_addr),
+    .csr_rdata_o      (ex_csr_rdata)
 );
-`endif
 
-ex_mem u_ex_mem(
-    .clk            (clk),
-    .rst            (rst),
-
-    .reg_wr_en_in   (reg_wr_en_ex),
-    .mem_wr_en_in   (mem_wr_en_ex),
-    .lsu_ctrl_in    (lsu_ctrl_ex),
-    .result_src_in  (result_src_ex),
-    .alu_result_in  (alu_result_ex),
-    .pc_plus_4_in   (pc_plus_4_ex),
-    .rs2_data_in    (rs2_data_mux_out),
-    .rd_in          (rd_ex),
-
-    .reg_wr_en_out  (reg_wr_en_mem),
-    .mem_wr_en_out  (mem_wr_en_mem),
-    .lsu_ctrl_out   (lsu_ctrl_mem),
-    .result_src_out (result_src_mem),
-    .alu_result_out (alu_result_mem),
-    .pc_plus_4_out  (pc_plus_4_mem),
-    .rs2_data_out   (rs2_data_mem),
-    .rd_out         (rd_mem)
-
-`ifdef Zicsr_EXT
-    ,
-    .csr_rd_data_in  (csr_rd_data_ex),
-    .csr_rd_data_out (csr_rd_data_mem)
-`endif
-
-`ifdef DEBUG
-    ,
-    .opcode_type_in  (opcode_type_ex),
-    .opcode_type_out (opcode_type_mem)
-`endif
+reg_ex_mem u_ex_mem(
+    .clk         (clk),
+    .rst         (rst),
+    .reg_wen_i   (ex_reg_wen),
+    .mem_wen_i   (ex_mem_wen),
+    .lsu_ctrl_i  (ex_lsu_ctrl),
+    .result_src_i(ex_result_src),
+    .alu_result_i(ex_alu_result),
+    .pc_plus_4_i (ex_pc_plus_4),
+    .rs2_data_i  (ex_rs2_data_fwd),
+    .rd_addr_i   (ex_rd_addr),
+    .csr_rdata_i (ex_csr_rdata),
+    .reg_wen_o   (mem_reg_wen),
+    .mem_wen_o   (mem_mem_wen),
+    .lsu_ctrl_o  (mem_lsu_ctrl),
+    .result_src_o(mem_result_src),
+    .alu_result_o(mem_alu_result),
+    .pc_plus_4_o (mem_pc_plus_4),
+    .rs2_data_o  (mem_rs2_data),
+    .rd_addr_o   (mem_rd_addr),
+    .csr_rdata_o (mem_csr_rdata)
 );
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Memory Access
 ////////////////////////////////////////////////////////////////////////////////
 
 lsu u_lsu(
-    .lsu_ctrl       (lsu_ctrl_mem),
-    .addr           (alu_result_mem),
-    .wr_en          (mem_wr_en_mem),
-    .wr_data        (rs2_data_mem),
-    .rd_data        (dmem_rd_data),
-
-    .mem_wr_en      (dmem_wr_en),
-    .mem_bit_wr_en  (dmem_bit_wr_en),
-    .mem_addr       (dmem_addr),
-    .mem_wr_data    (dmem_wr_data),
-    .mem_rd_data    (mem_rd_data_mem)
+    .ctrl_i     (mem_lsu_ctrl),
+    .addr_i     (mem_alu_result),
+    .wen_i      (mem_mem_wen),
+    .wdata_i    (mem_rs2_data),
+    .rdata_i    (dmem_rdata),
+    .mem_wen_o  (dmem_wen),
+    .mem_bwe_o  (dmem_bwe),
+    .mem_addr_o (dmem_addr),
+    .mem_wdata_o(dmem_wdata),
+    .mem_rdata_o(mem_mem_rdata)
 );
 
-mem_wb u_mem_wb(
-    .clk             (clk),
-    .rst             (rst),
-
-    .reg_wr_en_in    (reg_wr_en_mem),
-    .result_src_in   (result_src_mem),
-    .alu_result_in   (alu_result_mem),
-    .mem_rd_data_in  (mem_rd_data_mem),
-    .rd_in           (rd_mem),
-    .pc_plus_4_in    (pc_plus_4_mem),
-
-    .reg_wr_en_out   (reg_wr_en_wb),
-    .result_src_out  (result_src_wb),
-    .alu_result_out  (alu_result_wb),
-    .mem_rd_data_out (mem_rd_data_wb),
-    .rd_out          (rd_wb),
-    .pc_plus_4_out   (pc_plus_4_wb)
-
-`ifdef Zicsr_EXT
-    ,
-    .csr_rd_data_in      (csr_rd_data_mem),
-    .csr_rd_data_out     (csr_rd_data_wb)
-`endif
-
-`ifdef DEBUG
-    ,
-    .opcode_type_in  (opcode_type_mem),
-    .opcode_type_out (opcode_type_wb)
-`endif
+reg_mem_wb u_mem_wb(
+    .clk         (clk),
+    .rst         (rst),
+    .reg_wen_i   (mem_reg_wen),
+    .result_src_i(mem_result_src),
+    .alu_result_i(mem_alu_result),
+    .mem_rdata_i (mem_mem_rdata),
+    .rd_addr_i   (mem_rd_addr),
+    .pc_plus_4_i (mem_pc_plus_4),
+    .csr_rdata_i (mem_csr_rdata),
+    .reg_wen_o   (wb_reg_wen),
+    .result_src_o(wb_result_src),
+    .alu_result_o(wb_alu_result),
+    .mem_rdata_o (wb_mem_rdata),
+    .rd_addr_o   (wb_rd_addr),
+    .pc_plus_4_o (wb_pc_plus_4),
+    .csr_rdata_o (wb_csr_rdata)
 );
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Write Back
@@ -568,16 +480,47 @@ mem_wb u_mem_wb(
 //   - PC + 4 (for JAL/JALR)
 //   - ALU result
 //   - Memory read data
-//   - CSR read data (if Zicsr is enabled)
-result_mux u_result_mux(
-    .pc_plus_4   (pc_plus_4_wb),
-    .alu_result  (alu_result_wb),
-    .mem_rd_data (mem_rd_data_wb),
-`ifdef Zicsr_EXT
-    .csr_rd_data (csr_rd_data_wb),
+//   - CSR read data
+always_comb begin
+    case (wb_result_src)
+        RESULT_SRC_PC_PLUS_4: begin
+            wb_result = wb_pc_plus_4;
+        end
+        RESULT_SRC_ALU: begin
+            wb_result = wb_alu_result;
+        end
+        RESULT_SRC_MEM: begin
+            wb_result = wb_mem_rdata;
+        end
+        RESULT_SRC_CSR: begin
+            wb_result = wb_csr_rdata;
+        end
+        default: begin
+            wb_result = 32'd0;
+        end
+    endcase
+end
+
+////////////////////////////////////////////////////////////////////////////////
+// Debug
+////////////////////////////////////////////////////////////////////////////////
+
+`ifdef DEBUG
+opcodeType_e ex_opcode_type;
+opcodeType_e mem_opcode_type;
+opcodeType_e wb_opcode_type;
+
+always_ff @(posedge clk) begin
+    if (rst) begin
+        ex_opcode_type <= NOP;
+        mem_opcode_type <= NOP;
+        wb_opcode_type <= NOP;
+    end else begin
+        ex_opcode_type <= id_opcode_type;
+        mem_opcode_type <= ex_opcode_type;
+        wb_opcode_type <= mem_opcode_type;
+    end
+end
 `endif
-    .result_sel  (result_src_wb),
-    .result_out  (result_wb)
-);
 
 endmodule

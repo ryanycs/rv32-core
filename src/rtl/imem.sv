@@ -1,8 +1,10 @@
 `include "define.svh"
 
 module imem(
-    input  logic [31:0] addr,    // Address
-    output logic [31:0] rd_data  // Data output
+    input  logic        clk,
+    input  logic        rst,
+    input  logic [31:0] addr,
+    output logic [31:0] rdata
 );
 
 logic [31:0] mem [511:0][31:0];
@@ -14,7 +16,15 @@ assign row_addr = (addr >> 2) / 32;
 assign col_addr = (addr >> 2) % 32;
 
 always_comb begin
-    rd_data = mem[row_addr][col_addr];
+    rdata = mem[row_addr][col_addr];
 end
+
+// always_ff @(posedge clk or posedge rst) begin
+//     if (rst) begin
+//         rdata <= 32'd0;
+//     end else begin
+//         rdata <= mem[row_addr][col_addr];
+//     end
+// end
 
 endmodule

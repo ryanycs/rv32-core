@@ -8,37 +8,40 @@ module top(
 );
 
 logic [31:0] imem_addr;
-logic [31:0] imem_rd_data;
+logic [31:0] imem_rdata;
 logic [31:0] dmem_addr;
-logic [31:0] dmem_wr_data;
-logic        dmem_wr_en;
-logic [31:0] dmem_bit_wr_en;
-logic [31:0] dmem_rd_data;
+logic [31:0] dmem_wdata;
+logic        dmem_wen;
+logic [31:0] dmem_bwe;
+logic [31:0] dmem_rdata;
 
 core u_core(
-    .clk            (clk),
-    .rst            (rst),
-    .imem_rd_data   (imem_rd_data),
-    .dmem_rd_data   (dmem_rd_data),
-    .imem_addr      (imem_addr),
-    .dmem_wr_en     (dmem_wr_en),
-    .dmem_bit_wr_en (dmem_bit_wr_en),
-    .dmem_addr      (dmem_addr),
-    .dmem_wr_data   (dmem_wr_data)
+    .clk       (clk),
+    .rst       (rst),
+    .imem_addr (imem_addr),
+    .imem_rdata(imem_rdata),
+    .dmem_wen  (dmem_wen),
+    .dmem_bwe  (dmem_bwe),
+    .dmem_addr (dmem_addr),
+    .dmem_wdata(dmem_wdata),
+    .dmem_rdata(dmem_rdata)
 );
 
 imem u_imem(
-    .addr    (imem_addr),
-    .rd_data (imem_rd_data)
+    .clk  (clk),
+    .rst  (rst),
+    .addr (imem_addr),
+    .rdata(imem_rdata)
 );
 
 dmem u_dmem(
-    .clk       (clk),
-    .wr_en     (dmem_wr_en),
-    .bit_wr_en (dmem_bit_wr_en),
-    .addr      (dmem_addr),
-    .wr_data   (dmem_wr_data),
-    .rd_data   (dmem_rd_data)
+    .clk  (clk),
+    .rst  (rst),
+    .wen  (dmem_wen),
+    .bwe  (dmem_bwe),
+    .addr (dmem_addr),
+    .wdata(dmem_wdata),
+    .rdata(dmem_rdata)
 );
 
 endmodule

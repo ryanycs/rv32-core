@@ -1,34 +1,41 @@
 `include "types.svh"
 
-module branch_comp (
-    input  logic [31:0]  a,
-    input  logic [31:0]  b,
-    input  branchCtrl_e  branch_ctrl,
-    output logic         branch_taken
+module branch_comp(
+    input  logic        [31:0] a_i,
+    input  logic        [31:0] b_i,
+    input  branchCtrl_e        ctrl_i,
+    output logic               branch_taken_o
 );
 
 always_comb begin
-    case (branch_ctrl)
-        BRANCH_EQ:
-            branch_taken = (a == b);
+    case (ctrl_i)
+        BRANCH_EQ: begin
+            branch_taken_o = (a_i == b_i);
+        end
 
-        BRANCH_NE:
-            branch_taken = (a != b);
+        BRANCH_NE: begin
+            branch_taken_o = (a_i != b_i);
+        end
 
-        BRANCH_LT:
-            branch_taken = ($signed(a) < $signed(b));
+        BRANCH_LT: begin
+            branch_taken_o = ($signed(a_i) < $signed(b_i));
+        end
 
-        BRANCH_GE:
-            branch_taken = ($signed(a) >= $signed(b));
+        BRANCH_GE: begin
+            branch_taken_o = ($signed(a_i) >= $signed(b_i));
+        end
 
-        BRANCH_LTU:
-            branch_taken = (a < b);
+        BRANCH_LTU: begin
+            branch_taken_o = (a_i < b_i);
+        end
 
-        BRANCH_GEU:
-            branch_taken = (a >= b);
+        BRANCH_GEU: begin
+            branch_taken_o = (a_i >= b_i);
+        end
 
-        default:
-            branch_taken = 1'b0;
+        default: begin
+            branch_taken_o = 1'b0;
+        end
     endcase
 end
 

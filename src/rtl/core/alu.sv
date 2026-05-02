@@ -1,49 +1,61 @@
 `include "types.svh"
 
 module alu(
-    input  logic [31:0]  a,
-    input  logic [31:0]  b,
-    input  aluCtrl_e     alu_ctrl,
-    output logic [31:0]  alu_result
+    input  logic     [31:0] a_i,
+    input  logic     [31:0] b_i,
+    input  aluCtrl_e        ctrl_i,
+    output logic     [31:0] res_o
 );
 
 always_comb begin
-    case (alu_ctrl)
-        ALU_ADD:
-            alu_result = a + b;
+    case (ctrl_i)
+        ALU_ADD: begin
+            res_o = a_i + b_i;
+        end
 
-        ALU_SUB:
-            alu_result = a - b;
+        ALU_SUB: begin
+            res_o = a_i - b_i;
+        end
 
-        ALU_AND:
-            alu_result = a & b;
+        ALU_AND: begin
+            res_o = a_i & b_i;
+        end
 
-        ALU_OR:
-            alu_result = a | b;
+        ALU_OR: begin
+            res_o = a_i | b_i;
+        end
 
-        ALU_XOR:
-            alu_result = a ^ b;
+        ALU_XOR: begin
+            res_o = a_i ^ b_i;
+        end
 
-        ALU_SLL:
-            alu_result = a << b[4:0];
+        ALU_SLL: begin
+            res_o = a_i << b_i[4:0];
+        end
 
-        ALU_SRL:
-            alu_result = a >> b[4:0];
+        ALU_SRL: begin
+            res_o = a_i >> b_i[4:0];
+        end
 
-        ALU_SRA:
-            alu_result = $signed(a) >>> b[4:0];
+        ALU_SRA: begin
+            res_o = $signed(a_i) >>> b_i[4:0];
+        end
 
-        ALU_SLT:
-            alu_result = $signed(a) < $signed(b) ? 32'd1 : 32'd0;
+        ALU_SLT: begin
+            res_o = $signed(a_i) < $signed(b_i) ? 32'd1 : 32'd0;
+        end
 
-        ALU_SLTU:
-            alu_result = a < b ? 32'd1 : 32'd0;
+        ALU_SLTU: begin
+            res_o = a_i < b_i ? 32'd1 : 32'd0;
+        end
 
-        ALU_LUI:
-            alu_result = b;
+        ALU_LUI: begin
+            res_o = b_i;
+        end
 
-        default:
-            alu_result = 32'd0;
+        default: begin
+            res_o = 32'd0;
+        end
     endcase
 end
 

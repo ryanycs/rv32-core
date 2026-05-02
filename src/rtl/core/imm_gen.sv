@@ -1,30 +1,36 @@
 `include "types.svh"
 
 module imm_gen(
-    input  logic [31:0]  inst,
-    input  immType_e     imm_type,
-    output logic [31:0]  imm
+    input  logic     [31:0] inst_i,
+    input  immType_e        imm_type_i,
+    output logic     [31:0] imm_o
 );
 
 always_comb begin
-    case (imm_type)
-        I_TYPE:
-            imm = { { 21{inst[31]}}, inst[30:20] };
+    case (imm_type_i)
+        I_TYPE: begin
+            imm_o = { { 21{inst_i[31]}}, inst_i[30:20] };
+        end
 
-        S_TYPE:
-            imm = { { 21{inst[31]}}, inst[30:25], inst[11:7] };
+        S_TYPE: begin
+            imm_o = { { 21{inst_i[31]}}, inst_i[30:25], inst_i[11:7] };
+        end
 
-        B_TYPE:
-            imm = { { 20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0 };
+        B_TYPE: begin
+            imm_o = { { 20{inst_i[31]}}, inst_i[7], inst_i[30:25], inst_i[11:8], 1'b0 };
+        end
 
-        U_TYPE:
-            imm = { inst[31:12], 12'b0 };
+        U_TYPE: begin
+            imm_o = { inst_i[31:12], 12'b0 };
+        end
 
-        J_TYPE:
-            imm = { { 12{inst[31]}}, inst[19:12], inst[20], inst[30:25], inst[24:21], 1'b0 };
+        J_TYPE: begin
+            imm_o = { { 12{inst_i[31]}}, inst_i[19:12], inst_i[20], inst_i[30:25], inst_i[24:21], 1'b0 };
+        end
 
-        default:
-            imm = 32'b0;
+        default: begin
+            imm_o = 32'b0;
+        end
     endcase
 end
 

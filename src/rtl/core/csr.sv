@@ -1,11 +1,11 @@
 `include "types.svh"
 
 module csr(
-    input  logic         clk,
-    input  logic         rst,
-    input  logic         csr_instret_inc,
-    input  logic [11:0]  csr_addr,
-    output logic [31:0]  csr_rd_data
+    input  logic        clk,
+    input  logic        rst,
+    input  logic        csr_instret_inc_i,
+    input  logic [11:0] csr_addr_i,
+    output logic [31:0] csr_rdata_o
 );
 
 // CSR Registers
@@ -26,28 +26,33 @@ always_ff @(posedge clk or posedge rst) begin
     if (rst) begin
         instret <= 32'd0;
     end else begin
-        if (csr_instret_inc) begin
+        if (csr_instret_inc_i) begin
             instret <= instret + 32'd1;
         end
     end
 end
 
 always_comb begin
-    case (csr_addr)
-        CSR_CYCLE:
-            csr_rd_data = cycle[31:0];
+    case (csr_addr_i)
+        CSR_CYCLE: begin
+            csr_rdata_o = cycle[31:0];
+        end
 
-        CSR_CYCLEH:
-            csr_rd_data = cycle[63:32];
+        CSR_CYCLEH: begin
+            csr_rdata_o = cycle[63:32];
+        end
 
-        CSR_INSTRET:
-            csr_rd_data = instret[31:0];
+        CSR_INSTRET: begin
+            csr_rdata_o = instret[31:0];
+        end
 
-        CSR_INSTRETH:
-            csr_rd_data = instret[63:32];
+        CSR_INSTRETH: begin
+            csr_rdata_o = instret[63:32];
+        end
 
-        default:
-            csr_rd_data = 32'd0;
+        default: begin
+            csr_rdata_o = 32'd0;
+        end
     endcase
 end
 
