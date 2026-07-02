@@ -15,16 +15,12 @@ logic [4:0] col_addr;
 assign row_addr = (addr >> 2) / 32;
 assign col_addr = (addr >> 2) % 32;
 
-always_comb begin
-    rdata = mem[row_addr][col_addr];
+always_ff @(posedge clk or posedge rst) begin
+    if (rst) begin
+        rdata <= 32'd0;
+    end else begin
+        rdata <= mem[row_addr][col_addr];
+    end
 end
-
-// always_ff @(posedge clk or posedge rst) begin
-//     if (rst) begin
-//         rdata <= 32'd0;
-//     end else begin
-//         rdata <= mem[row_addr][col_addr];
-//     end
-// end
 
 endmodule

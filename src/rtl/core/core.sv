@@ -20,9 +20,11 @@ module core(
     input  logic        clk,
     input  logic        rst,
 
+    // Instruction memory
     output logic [31:0] imem_addr,
     input  logic [31:0] imem_rdata,
 
+    // Data memory
     output logic        dmem_wen,
     output logic [31:0] dmem_bwe,
     output logic [31:0] dmem_addr,
@@ -46,6 +48,7 @@ logic [31:0] if_inst;
 logic [31:0] id_pc;
 logic [31:0] id_pc_plus_4;
 logic [31:0] id_inst;
+logic [31:0] id_inst_prev;
 // Register addr
 logic [4:0]  id_rd_addr;
 logic [4:0]  id_rs1_addr;
@@ -150,7 +153,9 @@ forwardCtrl_e forward_b;
 // Hazard signals
 logic stall_pc;
 logic stall_if_id;
+logic stall_if_id_s1;
 logic flush_if_id;
+logic flush_if_id_s1;
 logic flush_id_ex;
 // }}}
 
@@ -169,7 +174,6 @@ pc u_pc(
 
 assign if_pc_plus_4 = if_pc + 32'd4;
 assign imem_addr = if_pc;
-assign if_inst = imem_rdata;
 
 // Pipeline Register IF/ID
 reg_if_id u_if_id(
@@ -179,10 +183,8 @@ reg_if_id u_if_id(
     .flush      (flush_if_id),
     .pc_i       (if_pc),
     .pc_plus_4_i(if_pc_plus_4),
-    .inst_i     (if_inst),
     .pc_o       (id_pc),
-    .pc_plus_4_o(id_pc_plus_4),
-    .inst_o     (id_inst)
+    .pc_plus_4_o(id_pc_plus_4)
 );
 
 // PC select:
@@ -207,7 +209,26 @@ end
 // Instruction Decode
 ////////////////////////////////////////////////////////////////////////////////
 
-// assign id_inst = imem_rdata;
+// Delay 1 cycle to match the IMEM read latency
+always_ff @(posedge clk) begin
+    flush_if_id_s1 <= flush_if_id;
+    stall_if_id_s1 <= stall_if_id;
+    id_inst_prev <= imem_rdata; // for stall
+end
+
+// Mux for instruction
+//   - flush
+//   - stall
+//   - instruction from IMEM
+always_comb begin
+    if (flush_if_id_s1) begin
+        id_inst = 32'd0;
+    end else if (stall_if_id_s1) begin
+        id_inst = id_inst_prev;
+    end else begin
+        id_inst = imem_rdata;
+    end
+end
 
 decoder u_decoder(
     .inst_i       (id_inst),
@@ -440,6 +461,7 @@ reg_ex_mem u_ex_mem(
 ////////////////////////////////////////////////////////////////////////////////
 
 lsu u_lsu(
+    .clk        (clk),
     .ctrl_i     (mem_lsu_ctrl),
     .addr_i     (mem_alu_result),
     .wen_i      (mem_mem_wen),
@@ -449,7 +471,7 @@ lsu u_lsu(
     .mem_bwe_o  (dmem_bwe),
     .mem_addr_o (dmem_addr),
     .mem_wdata_o(dmem_wdata),
-    .mem_rdata_o(mem_mem_rdata)
+    .mem_rdata_o(wb_mem_rdata)
 );
 
 reg_mem_wb u_mem_wb(
@@ -458,14 +480,12 @@ reg_mem_wb u_mem_wb(
     .reg_wen_i   (mem_reg_wen),
     .result_src_i(mem_result_src),
     .alu_result_i(mem_alu_result),
-    .mem_rdata_i (mem_mem_rdata),
     .rd_addr_i   (mem_rd_addr),
     .pc_plus_4_i (mem_pc_plus_4),
     .csr_rdata_i (mem_csr_rdata),
     .reg_wen_o   (wb_reg_wen),
     .result_src_o(wb_result_src),
     .alu_result_o(wb_alu_result),
-    .mem_rdata_o (wb_mem_rdata),
     .rd_addr_o   (wb_rd_addr),
     .pc_plus_4_o (wb_pc_plus_4),
     .csr_rdata_o (wb_csr_rdata)

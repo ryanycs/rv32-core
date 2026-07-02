@@ -1,6 +1,7 @@
 `include "types.svh"
 
 module lsu(
+    input  logic        clk,
     input  lsuCtrl_e    ctrl_i,
     input  logic [31:0] addr_i,
     input  logic        wen_i,
@@ -14,9 +15,13 @@ module lsu(
     output logic [31:0] mem_rdata_o
 );
 
+lsuCtrl_e   ctrl_s1;
+logic [1:0] addr_s1;
+
 assign mem_wen_o = wen_i;
 assign mem_addr_o  = addr_i;
 
+// mem_wdata_o
 always_comb begin
     case (ctrl_i)
         LSU_SB: begin
@@ -46,6 +51,7 @@ always_comb begin
     endcase
 end
 
+// mem_bwe_o
 always_comb begin
     mem_bwe_o = 32'h00000000;
 
@@ -73,16 +79,36 @@ always_comb begin
     endcase
 end
 
+// Delay 1 cycle to match the DMEM read latency
+always_ff @(posedge clk) begin
+    ctrl_s1 <= ctrl_i;
+    addr_s1 <= addr_i[1:0];
+end
+
+// mem_rdata_o
 always_comb begin
     mem_rdata_o   = rdata_i;
 
-    case (ctrl_i)
+    case (ctrl_s1)
         LSU_LB: begin
-            mem_rdata_o = { { 24{mem_rdata_o[7]}}, mem_rdata_o[7:0] };
+            case (addr_s1)
+                2'b00:
+                    mem_rdata_o = { { 24{rdata_i[7]}}, rdata_i[7:0]};
+                2'b01:
+                    mem_rdata_o = { { 24{rdata_i[15]}}, rdata_i[15:8]};
+                2'b10:
+                    mem_rdata_o = { { 24{rdata_i[23]}}, rdata_i[23:16]};
+                2'b11:
+                    mem_rdata_o = { { 24{rdata_i[31]}}, rdata_i[31:24]};
+            endcase
         end
 
         LSU_LH: begin
-            mem_rdata_o = { { 16{mem_rdata_o[15]}}, mem_rdata_o[15:0] };
+            if (addr_s1[1]) begin
+                mem_rdata_o = { { 16{rdata_i[31]}}, rdata_i[31:16] };
+            end else begin
+                mem_rdata_o = { { 16{rdata_i[15]}}, rdata_i[15:0] };
+            end
         end
 
         LSU_LW: begin
@@ -90,11 +116,24 @@ always_comb begin
         end
 
         LSU_LBU: begin
-            mem_rdata_o = { 24'h000000, mem_rdata_o[7:0] };
+            case (addr_s1)
+                2'b00:
+                    mem_rdata_o = { 24'h000000, rdata_i[7:0]};
+                2'b01:
+                    mem_rdata_o = { 24'h000000, rdata_i[15:8]};
+                2'b10:
+                    mem_rdata_o = { 24'h000000, rdata_i[23:16]};
+                2'b11:
+                    mem_rdata_o = { 24'h000000, rdata_i[31:24]};
+            endcase
         end
 
         LSU_LHU: begin
-            mem_rdata_o = { 16'h0000, mem_rdata_o[15:0] };
+            if (addr_s1[1]) begin
+                mem_rdata_o = { 16'h0000, rdata_i[31:16] };
+            end else begin
+                mem_rdata_o = { 16'h0000, rdata_i[15:0] };
+            end
         end
     endcase
 end
