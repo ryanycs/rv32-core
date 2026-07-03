@@ -67,8 +67,8 @@ typedef enum logic [4:0] {
 
 
 typedef enum logic {
-    ALU_SRC1_PC,
-    ALU_SRC1_RS1
+    ALU_SRC1_RS1,
+    ALU_SRC1_PC
 } aluSrc1_e;
 
 

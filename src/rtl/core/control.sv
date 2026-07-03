@@ -4,6 +4,7 @@ module control(
     input  opcodeType_e opcode_type_i,
 
     output logic        reg_wen_o,
+    output logic        mem_ceb_o,
     output logic        mem_wen_o,
     output logic        jump_o,
     output logic        branch_o,
@@ -18,6 +19,7 @@ module control(
 
 always_comb begin
     reg_wen_o         = 1'b0;
+    mem_ceb_o         = 1'b0;
     mem_wen_o         = 1'b0;
     jump_o            = 1'b0;
     branch_o          = 1'b0;
@@ -265,6 +267,7 @@ always_comb begin
 
         LB: begin
             reg_wen_o    = 1'b1;
+            mem_ceb_o    = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -274,6 +277,7 @@ always_comb begin
 
         LH: begin
             reg_wen_o    = 1'b1;
+            mem_ceb_o    = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -283,6 +287,7 @@ always_comb begin
 
         LW: begin
             reg_wen_o    = 1'b1;
+            mem_ceb_o    = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -292,6 +297,7 @@ always_comb begin
 
         LBU: begin
             reg_wen_o    = 1'b1;
+            mem_ceb_o    = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -301,6 +307,7 @@ always_comb begin
 
         LHU: begin
             reg_wen_o    = 1'b1;
+            mem_ceb_o    = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -309,6 +316,7 @@ always_comb begin
         end
 
         SB: begin
+            mem_ceb_o  = 1'b1;
             mem_wen_o  = 1'b1;
             alu_ctrl_o = ALU_ADD;
             alu_src1_o = ALU_SRC1_RS1;
@@ -317,6 +325,7 @@ always_comb begin
         end
 
         SH: begin
+            mem_ceb_o  = 1'b1;
             mem_wen_o  = 1'b1;
             alu_ctrl_o = ALU_ADD;
             alu_src1_o = ALU_SRC1_RS1;
@@ -325,6 +334,7 @@ always_comb begin
         end
 
         SW: begin
+            mem_ceb_o  = 1'b1;
             mem_wen_o  = 1'b1;
             alu_ctrl_o = ALU_ADD;
             alu_src1_o = ALU_SRC1_RS1;

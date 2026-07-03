@@ -1,4 +1,3 @@
-`include "define.svh"
 `include "types.svh"
 
 module pc(
@@ -14,7 +13,7 @@ logic [31:0] pc_reg;
 
 always_ff @(posedge clk or posedge rst) begin
     if (rst) begin
-        pc_reg <= PC_START_ADDR;
+        pc_reg <= 32'd0;
     end else if (!stall) begin
         pc_reg <= pc_i;
     end

@@ -1,4 +1,3 @@
-`include "define.svh"
 `include "types.svh"
 
 module regfile(
@@ -41,7 +40,6 @@ always_ff @(posedge clk or posedge rst) begin
         for (int i = 1; i < 32; i = i + 1) begin
             reg_file[i] <= 32'd0;
         end
-        reg_file[2] <= SP_START_ADDR;
     end else if (wen_i) begin
         reg_file[waddr_i] <= wdata_i;
     end

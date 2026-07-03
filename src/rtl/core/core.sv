@@ -25,6 +25,7 @@ module core(
     input  logic [31:0] imem_rdata,
 
     // Data memory
+    output logic        dmem_ceb,
     output logic        dmem_wen,
     output logic [31:0] dmem_bwe,
     output logic [31:0] dmem_addr,
@@ -65,6 +66,7 @@ logic        id_csr_instret_inc;
 // Control signal
 opcodeType_e id_opcode_type;
 logic        id_reg_wen;
+logic        id_mem_ceb;
 logic        id_mem_wen;
 aluCtrl_e    id_alu_ctrl;
 logic        id_jump;
@@ -102,6 +104,7 @@ logic        ex_csr_instret_inc;
 logic [31:0] ex_csr_rdata;
 // Control signal
 logic        ex_reg_wen;
+logic        ex_mem_ceb;
 logic        ex_mem_wen;
 aluCtrl_e    ex_alu_ctrl;
 logic        ex_jump;
@@ -122,6 +125,7 @@ logic [31:0] mem_alu_result;
 logic [31:0] mem_mem_rdata;
 // Control signal
 logic        mem_reg_wen;
+logic        mem_mem_ceb;
 logic        mem_mem_wen;
 lsuCtrl_e    mem_lsu_ctrl;
 resultSrc_e  mem_result_src;
@@ -210,18 +214,26 @@ end
 ////////////////////////////////////////////////////////////////////////////////
 
 // Delay 1 cycle to match the IMEM read latency
-always_ff @(posedge clk) begin
-    flush_if_id_s1 <= flush_if_id;
-    stall_if_id_s1 <= stall_if_id;
-    id_inst_prev <= imem_rdata; // for stall
+always_ff @(posedge clk or posedge rst) begin
+    if (rst) begin
+        flush_if_id_s1 <= 1'b0;
+        stall_if_id_s1 <= 1'b0;
+        id_inst_prev <= 32'd0;
+    end else begin
+        flush_if_id_s1 <= flush_if_id;
+        stall_if_id_s1 <= stall_if_id;
+        id_inst_prev <= imem_rdata; // for stall
+    end
 end
 
 // Mux for instruction
 //   - flush
+//      - To avoid fetching UNKNOWN value form IMEM,
+//        flush the instruction after reset (if_pc == 32'd0)
 //   - stall
 //   - instruction from IMEM
 always_comb begin
-    if (flush_if_id_s1) begin
+    if (flush_if_id_s1 || if_pc == 32'd0) begin
         id_inst = 32'd0;
     end else if (stall_if_id_s1) begin
         id_inst = id_inst_prev;
@@ -249,6 +261,7 @@ imm_gen u_imm_gen(
 control u_control(
     .opcode_type_i    (id_opcode_type),
     .reg_wen_o        (id_reg_wen),
+    .mem_ceb_o        (id_mem_ceb),
     .mem_wen_o        (id_mem_wen),
     .jump_o           (id_jump),
     .branch_o         (id_branch),
@@ -278,6 +291,7 @@ reg_id_ex u_id_ex(
     .rst              (rst),
     .flush            (flush_id_ex),
     .reg_wen_i        (id_reg_wen),
+    .mem_ceb_i        (id_mem_ceb),
     .mem_wen_i        (id_mem_wen),
     .jump_i           (id_jump),
     .branch_i         (id_branch),
@@ -298,6 +312,7 @@ reg_id_ex u_id_ex(
     .csr_instret_inc_i(id_csr_instret_inc),
     .csr_addr_i       (id_csr_addr),
     .reg_wen_o        (ex_reg_wen),
+    .mem_ceb_o        (ex_mem_ceb),
     .mem_wen_o        (ex_mem_wen),
     .jump_o           (ex_jump),
     .branch_o         (ex_branch),
@@ -345,13 +360,13 @@ always_comb begin
 end
 
 // Mux for ALU operand a:
-//   - PC
 //   - rs1
+//   - PC
 always_comb begin
     if (ex_alu_src1) begin
-        ex_alu_a = ex_rs1_data_fwd;
-    end else begin
         ex_alu_a = ex_pc;
+    end else begin
+        ex_alu_a = ex_rs1_data_fwd;
     end
 end
 
@@ -436,6 +451,7 @@ reg_ex_mem u_ex_mem(
     .clk         (clk),
     .rst         (rst),
     .reg_wen_i   (ex_reg_wen),
+    .mem_ceb_i   (ex_mem_ceb),
     .mem_wen_i   (ex_mem_wen),
     .lsu_ctrl_i  (ex_lsu_ctrl),
     .result_src_i(ex_result_src),
@@ -445,6 +461,7 @@ reg_ex_mem u_ex_mem(
     .rd_addr_i   (ex_rd_addr),
     .csr_rdata_i (ex_csr_rdata),
     .reg_wen_o   (mem_reg_wen),
+    .mem_ceb_o   (mem_mem_ceb),
     .mem_wen_o   (mem_mem_wen),
     .lsu_ctrl_o  (mem_lsu_ctrl),
     .result_src_o(mem_result_src),
@@ -464,9 +481,11 @@ lsu u_lsu(
     .clk        (clk),
     .ctrl_i     (mem_lsu_ctrl),
     .addr_i     (mem_alu_result),
+    .ceb_i      (mem_mem_ceb),
     .wen_i      (mem_mem_wen),
     .wdata_i    (mem_rs2_data),
     .rdata_i    (dmem_rdata),
+    .mem_ceb_o  (dmem_ceb),
     .mem_wen_o  (dmem_wen),
     .mem_bwe_o  (dmem_bwe),
     .mem_addr_o (dmem_addr),

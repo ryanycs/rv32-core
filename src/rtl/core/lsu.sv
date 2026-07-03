@@ -4,10 +4,12 @@ module lsu(
     input  logic        clk,
     input  lsuCtrl_e    ctrl_i,
     input  logic [31:0] addr_i,
+    input  logic        ceb_i,
     input  logic        wen_i,
     input  logic [31:0] wdata_i,
     input  logic [31:0] rdata_i,
 
+    output logic        mem_ceb_o,
     output logic        mem_wen_o,
     output logic [31:0] mem_bwe_o,
     output logic [31:0] mem_addr_o,
@@ -18,6 +20,7 @@ module lsu(
 lsuCtrl_e   ctrl_s1;
 logic [1:0] addr_s1;
 
+assign mem_ceb_o = ceb_i;
 assign mem_wen_o = wen_i;
 assign mem_addr_o  = addr_i;
 
