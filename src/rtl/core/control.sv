@@ -3,7 +3,7 @@
 module control(
     input  opcodeType_e opcode_type_i,
 
-    output logic        reg_wen_o,
+    output logic        rf_wen_o,
     output logic        mem_ceb_o,
     output logic        mem_wen_o,
     output logic        jump_o,
@@ -18,7 +18,7 @@ module control(
 );
 
 always_comb begin
-    reg_wen_o         = 1'b0;
+    rf_wen_o          = 1'b0;
     mem_ceb_o         = 1'b0;
     mem_wen_o         = 1'b0;
     jump_o            = 1'b0;
@@ -33,7 +33,7 @@ always_comb begin
 
     case (opcode_type_i)
         ADDI: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -41,7 +41,7 @@ always_comb begin
         end
 
         SLLI: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_SLL;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -49,7 +49,7 @@ always_comb begin
         end
 
         SLTI: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_SLT;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -57,7 +57,7 @@ always_comb begin
         end
 
         SLTIU: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_SLTU;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -65,7 +65,7 @@ always_comb begin
         end
 
         XORI: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_XOR;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -73,7 +73,7 @@ always_comb begin
         end
 
         SRLI: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_SRL;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -81,7 +81,7 @@ always_comb begin
         end
 
         SRAI: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_SRA;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -89,7 +89,7 @@ always_comb begin
         end
 
         ORI: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_OR;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -97,7 +97,7 @@ always_comb begin
         end
 
         ANDI: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_AND;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -105,14 +105,14 @@ always_comb begin
         end
 
         LUI: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_LUI;
             alu_src2_o   = ALU_SRC2_IMM;
             result_src_o = RESULT_SRC_ALU;
         end
 
         AUIPC: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_PC;
             alu_src2_o   = ALU_SRC2_IMM;
@@ -120,7 +120,7 @@ always_comb begin
         end
 
         ADD: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_RS2;
@@ -128,7 +128,7 @@ always_comb begin
         end
 
         SUB: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_SUB;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_RS2;
@@ -136,7 +136,7 @@ always_comb begin
         end
 
         SLL: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_SLL;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_RS2;
@@ -144,7 +144,7 @@ always_comb begin
         end
 
         SLT: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_SLT;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_RS2;
@@ -152,7 +152,7 @@ always_comb begin
         end
 
         SLTU: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_SLTU;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_RS2;
@@ -160,7 +160,7 @@ always_comb begin
         end
 
         XOR: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_XOR;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_RS2;
@@ -168,7 +168,7 @@ always_comb begin
         end
 
         SRL: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_SRL;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_RS2;
@@ -176,7 +176,7 @@ always_comb begin
         end
 
         SRA: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_SRA;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_RS2;
@@ -184,7 +184,7 @@ always_comb begin
         end
 
         OR: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_OR;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_RS2;
@@ -192,7 +192,7 @@ always_comb begin
         end
 
         AND: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             alu_ctrl_o   = ALU_AND;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_RS2;
@@ -200,7 +200,7 @@ always_comb begin
         end
 
         JAL: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             jump_o       = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_PC;
@@ -209,7 +209,7 @@ always_comb begin
         end
 
         JALR: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             jump_o       = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
@@ -266,7 +266,7 @@ always_comb begin
         end
 
         LB: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             mem_ceb_o    = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
@@ -276,7 +276,7 @@ always_comb begin
         end
 
         LH: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             mem_ceb_o    = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
@@ -286,7 +286,7 @@ always_comb begin
         end
 
         LW: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             mem_ceb_o    = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
@@ -296,7 +296,7 @@ always_comb begin
         end
 
         LBU: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             mem_ceb_o    = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
@@ -306,7 +306,7 @@ always_comb begin
         end
 
         LHU: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             mem_ceb_o    = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
@@ -367,7 +367,7 @@ always_comb begin
         end
 
         CSRRS: begin
-            reg_wen_o    = 1'b1;
+            rf_wen_o     = 1'b1;
             result_src_o = RESULT_SRC_CSR;
         end
 

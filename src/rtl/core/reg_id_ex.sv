@@ -5,7 +5,7 @@ module reg_id_ex(
     input  logic        rst,
     input  logic        flush,
 
-    input  logic        reg_wen_i,
+    input  logic        rf_wen_i,
     input  logic        mem_ceb_i,
     input  logic        mem_wen_i,
     input  logic        jump_i,
@@ -27,7 +27,7 @@ module reg_id_ex(
     input  logic        csr_instret_inc_i,
     input  logic [11:0] csr_addr_i,
 
-    output logic        reg_wen_o,
+    output logic        rf_wen_o,
     output logic        mem_ceb_o,
     output logic        mem_wen_o,
     output logic        jump_o,
@@ -52,9 +52,9 @@ module reg_id_ex(
 
 always_ff @(posedge clk or posedge rst) begin
     if (rst) begin
-        reg_wen_o       <= 1'b0;
-        mem_ceb_o       <= 1'b0;
-        mem_wen_o       <= 1'b0;
+        rf_wen_o          <= 1'b0;
+        mem_ceb_o         <= 1'b0;
+        mem_wen_o         <= 1'b0;
         jump_o            <= 1'b0;
         branch_o          <= 1'b0;
         branch_ctrl_o     <= BRANCH_NOP;
@@ -74,9 +74,9 @@ always_ff @(posedge clk or posedge rst) begin
         csr_instret_inc_o <= 1'b0;
         csr_addr_o        <= 32'd0;
     end else if (flush) begin
-        reg_wen_o       <= 1'b0;
-        mem_ceb_o       <= 1'b0;
-        mem_wen_o       <= 1'b0;
+        rf_wen_o          <= 1'b0;
+        mem_ceb_o         <= 1'b0;
+        mem_wen_o         <= 1'b0;
         jump_o            <= 1'b0;
         branch_o          <= 1'b0;
         branch_ctrl_o     <= BRANCH_NOP;
@@ -96,9 +96,9 @@ always_ff @(posedge clk or posedge rst) begin
         csr_instret_inc_o <= 1'b0;
         csr_addr_o        <= 32'd0;
     end else begin
-        reg_wen_o       <= reg_wen_i;
-        mem_ceb_o       <= mem_ceb_i;
-        mem_wen_o       <= mem_wen_i;
+        rf_wen_o          <= rf_wen_i;
+        mem_ceb_o         <= mem_ceb_i;
+        mem_wen_o         <= mem_wen_i;
         jump_o            <= jump_i;
         branch_o          <= branch_i;
         branch_ctrl_o     <= branch_ctrl_i;

@@ -65,7 +65,7 @@ logic [11:0] id_csr_addr;
 logic        id_csr_instret_inc;
 // Control signal
 opcodeType_e id_opcode_type;
-logic        id_reg_wen;
+logic        id_rf_wen;
 logic        id_mem_ceb;
 logic        id_mem_wen;
 aluCtrl_e    id_alu_ctrl;
@@ -103,7 +103,7 @@ logic [11:0] ex_csr_addr;
 logic        ex_csr_instret_inc;
 logic [31:0] ex_csr_rdata;
 // Control signal
-logic        ex_reg_wen;
+logic        ex_rf_wen;
 logic        ex_mem_ceb;
 logic        ex_mem_wen;
 aluCtrl_e    ex_alu_ctrl;
@@ -124,7 +124,7 @@ logic [31:0] mem_rs2_data;
 logic [31:0] mem_alu_result;
 logic [31:0] mem_mem_rdata;
 // Control signal
-logic        mem_reg_wen;
+logic        mem_rf_wen;
 logic        mem_mem_ceb;
 logic        mem_mem_wen;
 lsuCtrl_e    mem_lsu_ctrl;
@@ -141,7 +141,7 @@ logic [31:0] wb_alu_result;
 logic [31:0] wb_mem_rdata;
 logic [31:0] wb_result;
 // Control signal
-logic        wb_reg_wen;
+logic        wb_rf_wen;
 resultSrc_e  wb_result_src;
 // CSR signal
 logic [31:0] wb_csr_rdata;
@@ -260,7 +260,7 @@ imm_gen u_imm_gen(
 
 control u_control(
     .opcode_type_i    (id_opcode_type),
-    .reg_wen_o        (id_reg_wen),
+    .rf_wen_o         (id_rf_wen),
     .mem_ceb_o        (id_mem_ceb),
     .mem_wen_o        (id_mem_wen),
     .jump_o           (id_jump),
@@ -279,7 +279,7 @@ regfile u_regfile(
     .rst       (rst),
     .rs1_addr_i(id_rs1_addr),
     .rs2_addr_i(id_rs2_addr),
-    .wen_i     (wb_reg_wen),
+    .wen_i     (wb_rf_wen),
     .waddr_i   (wb_rd_addr),
     .wdata_i   (wb_result),
     .rs1_data_o(id_rs1_data),
@@ -290,7 +290,7 @@ reg_id_ex u_id_ex(
     .clk              (clk),
     .rst              (rst),
     .flush            (flush_id_ex),
-    .reg_wen_i        (id_reg_wen),
+    .rf_wen_i         (id_rf_wen),
     .mem_ceb_i        (id_mem_ceb),
     .mem_wen_i        (id_mem_wen),
     .jump_i           (id_jump),
@@ -311,7 +311,7 @@ reg_id_ex u_id_ex(
     .rd_addr_i        (id_rd_addr),
     .csr_instret_inc_i(id_csr_instret_inc),
     .csr_addr_i       (id_csr_addr),
-    .reg_wen_o        (ex_reg_wen),
+    .rf_wen_o         (ex_rf_wen),
     .mem_ceb_o        (ex_mem_ceb),
     .mem_wen_o        (ex_mem_wen),
     .jump_o           (ex_jump),
@@ -421,8 +421,8 @@ forwarding u_forwarding(
     .rs2_addr_ex_i(ex_rs2_addr),
     .rd_addr_mem_i(mem_rd_addr),
     .rd_addr_wb_i (wb_rd_addr),
-    .reg_wen_mem_i(mem_reg_wen),
-    .reg_wen_wb_i (wb_reg_wen),
+    .rf_wen_mem_i (mem_rf_wen),
+    .rf_wen_wb_i  (wb_rf_wen),
     .forward_a_o  (forward_a),
     .forward_b_o  (forward_b)
 );
@@ -450,7 +450,7 @@ csr u_csr(
 reg_ex_mem u_ex_mem(
     .clk         (clk),
     .rst         (rst),
-    .reg_wen_i   (ex_reg_wen),
+    .rf_wen_i    (ex_rf_wen),
     .mem_ceb_i   (ex_mem_ceb),
     .mem_wen_i   (ex_mem_wen),
     .lsu_ctrl_i  (ex_lsu_ctrl),
@@ -460,7 +460,7 @@ reg_ex_mem u_ex_mem(
     .rs2_data_i  (ex_rs2_data_fwd),
     .rd_addr_i   (ex_rd_addr),
     .csr_rdata_i (ex_csr_rdata),
-    .reg_wen_o   (mem_reg_wen),
+    .rf_wen_o    (mem_rf_wen),
     .mem_ceb_o   (mem_mem_ceb),
     .mem_wen_o   (mem_mem_wen),
     .lsu_ctrl_o  (mem_lsu_ctrl),
@@ -496,13 +496,13 @@ lsu u_lsu(
 reg_mem_wb u_mem_wb(
     .clk         (clk),
     .rst         (rst),
-    .reg_wen_i   (mem_reg_wen),
+    .rf_wen_i    (mem_rf_wen),
     .result_src_i(mem_result_src),
     .alu_result_i(mem_alu_result),
     .rd_addr_i   (mem_rd_addr),
     .pc_plus_4_i (mem_pc_plus_4),
     .csr_rdata_i (mem_csr_rdata),
-    .reg_wen_o   (wb_reg_wen),
+    .rf_wen_o    (wb_rf_wen),
     .result_src_o(wb_result_src),
     .alu_result_o(wb_alu_result),
     .rd_addr_o   (wb_rd_addr),
