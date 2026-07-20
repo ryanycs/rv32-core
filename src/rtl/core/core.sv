@@ -404,6 +404,7 @@ reg_id_ex u_id_ex(
 // Mux for forwarding rs1 data:
 //   - rs1 (EX)
 //   - ALU result (MEM)
+//   - FPU result (MEM)
 //   - write-back data (WB)
 always_comb begin
     case (forward_a)
@@ -439,6 +440,7 @@ end
 // Mux for forwarding rs2 data:
 //   - rs2 (EX)
 //   - ALU result (MEM)
+//   - FPU result (MEM)
 //   - write-back data (WB)
 always_comb begin
     case (forward_b)
@@ -493,18 +495,18 @@ branch_comp u_branch_comp(
 );
 
 forwarding u_forwarding(
-    .rs1_addr_ex_i(ex_rs1_addr),
-    .rs2_addr_ex_i(ex_rs2_addr),
-    .rs1_sel_ex_i (ex_rs1_sel),
-    .rs2_sel_ex_i (ex_rs2_sel),
-    .rd_addr_mem_i(mem_rd_addr),
-    .rd_addr_wb_i (wb_rd_addr),
-    .rf_wen_mem_i (mem_rf_wen),
-    .rf_wen_wb_i  (wb_rf_wen),
+    .rs1_addr_ex_i  (ex_rs1_addr),
+    .rs2_addr_ex_i  (ex_rs2_addr),
+    .rs1_sel_ex_i   (ex_rs1_sel),
+    .rs2_sel_ex_i   (ex_rs2_sel),
+    .rd_addr_mem_i  (mem_rd_addr),
+    .rf_wen_mem_i   (mem_rf_wen),
     .fp_rf_wen_mem_i(mem_fp_rf_wen),
+    .rd_addr_wb_i   (wb_rd_addr),
+    .rf_wen_wb_i    (wb_rf_wen),
     .fp_rf_wen_wb_i (wb_fp_rf_wen),
-    .forward_a_o  (forward_a),
-    .forward_b_o  (forward_b)
+    .forward_a_o    (forward_a),
+    .forward_b_o    (forward_b)
 );
 
 hazard u_hazard(
