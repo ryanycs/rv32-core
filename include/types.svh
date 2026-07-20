@@ -62,7 +62,11 @@ typedef enum logic [4:0] {
     ALU_SRA,
     ALU_SLT,
     ALU_SLTU,
-    ALU_LUI
+    ALU_LUI,
+    ALU_MUL,
+    ALU_MULH,
+    ALU_MULHSU,
+    ALU_MULHU
 } aluCtrl_e;
 
 

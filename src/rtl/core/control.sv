@@ -351,15 +351,35 @@ always_comb begin
         end
 
         MUL: begin
+            rf_wen_o     = 1'b1;
+            alu_ctrl_o   = ALU_MUL;
+            alu_src1_o   = ALU_SRC1_RS1;
+            alu_src2_o   = ALU_SRC2_RS2;
+            result_src_o = RESULT_SRC_ALU;
         end
 
         MULH: begin
+            rf_wen_o     = 1'b1;
+            alu_ctrl_o   = ALU_MULH;
+            alu_src1_o   = ALU_SRC1_RS1;
+            alu_src2_o   = ALU_SRC2_RS2;
+            result_src_o = RESULT_SRC_ALU;
         end
 
         MULHSU: begin
+            rf_wen_o     = 1'b1;
+            alu_ctrl_o   = ALU_MULHSU;
+            alu_src1_o   = ALU_SRC1_RS1;
+            alu_src2_o   = ALU_SRC2_RS2;
+            result_src_o = RESULT_SRC_ALU;
         end
 
         MULHU: begin
+            rf_wen_o     = 1'b1;
+            alu_ctrl_o   = ALU_MULHU;
+            alu_src1_o   = ALU_SRC1_RS1;
+            alu_src2_o   = ALU_SRC2_RS2;
+            result_src_o = RESULT_SRC_ALU;
         end
 
         FADD: begin
