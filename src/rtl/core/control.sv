@@ -4,6 +4,9 @@ module control(
     input  opcodeType_e opcode_type_i,
 
     output logic        rf_wen_o,
+    output logic        fp_rf_wen_o,
+    output rfSel_e      rf_rs1_sel_o,
+    output rfSel_e      rf_rs2_sel_o,
     output logic        mem_ceb_o,
     output logic        mem_wen_o,
     output logic        jump_o,
@@ -12,6 +15,7 @@ module control(
     output aluCtrl_e    alu_ctrl_o,
     output aluSrc1_e    alu_src1_o,
     output aluSrc2_e    alu_src2_o,
+    output fpuCtrl_e    fpu_ctrl_o,
     output lsuCtrl_e    lsu_ctrl_o,
     output resultSrc_e  result_src_o,
     output logic        csr_instret_inc_o
@@ -19,6 +23,9 @@ module control(
 
 always_comb begin
     rf_wen_o          = 1'b0;
+    fp_rf_wen_o       = 1'b0;
+    rf_rs1_sel_o      = RF_SEL_INT;
+    rf_rs2_sel_o      = RF_SEL_INT;
     mem_ceb_o         = 1'b0;
     mem_wen_o         = 1'b0;
     jump_o            = 1'b0;
@@ -27,6 +34,7 @@ always_comb begin
     alu_ctrl_o        = ALU_NOP;
     alu_src1_o        = ALU_SRC1_RS1;
     alu_src2_o        = ALU_SRC2_RS2;
+    fpu_ctrl_o        = FPU_NOP;
     lsu_ctrl_o        = LSU_NOP;
     result_src_o      = RESULT_SRC_ALU;
     csr_instret_inc_o = 1'b1;
@@ -355,15 +363,39 @@ always_comb begin
         end
 
         FADD: begin
+            fp_rf_wen_o  = 1'b1;
+            rf_rs1_sel_o = RF_SEL_FP;
+            rf_rs2_sel_o = RF_SEL_FP;
+            fpu_ctrl_o   = FPU_ADD;
+            result_src_o = RESULT_SRC_FPU;
         end
 
         FSUB: begin
+            fp_rf_wen_o  = 1'b1;
+            rf_rs1_sel_o = RF_SEL_FP;
+            rf_rs2_sel_o = RF_SEL_FP;
+            fpu_ctrl_o   = FPU_SUB;
+            result_src_o = RESULT_SRC_FPU;
         end
 
         FLW: begin
+            fp_rf_wen_o  = 1'b1;
+            mem_ceb_o    = 1'b1;
+            alu_ctrl_o   = ALU_ADD;
+            alu_src1_o   = ALU_SRC1_RS1;
+            alu_src2_o   = ALU_SRC2_IMM;
+            lsu_ctrl_o   = LSU_LW;
+            result_src_o = RESULT_SRC_MEM;
         end
 
         FSW: begin
+            rf_rs2_sel_o = RF_SEL_FP;
+            mem_ceb_o    = 1'b1;
+            mem_wen_o    = 1'b1;
+            alu_ctrl_o   = ALU_ADD;
+            alu_src1_o   = ALU_SRC1_RS1;
+            alu_src2_o   = ALU_SRC2_IMM;
+            lsu_ctrl_o   = LSU_SW;
         end
 
         CSRRS: begin

@@ -54,7 +54,7 @@ always_comb begin
         OPCODE_OP_IMM, OPCODE_LOAD, OPCODE_JALR: begin
             imm_type_o = I_TYPE;
         end
-        OPCODE_STORE: begin
+        OPCODE_STORE, OPCODE_STORE_FP: begin
             imm_type_o = S_TYPE;
         end
         OPCODE_BRANCH: begin

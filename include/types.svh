@@ -92,7 +92,8 @@ typedef enum logic [2:0] {
 typedef enum logic [1:0] {
     FORWARD_NONE,
     FORWARD_FROM_WB,
-    FORWARD_FROM_MEM
+    FORWARD_FROM_MEM_ALU,
+    FORWARD_FROM_MEM_FPU
 } forwardCtrl_e;
 
 
@@ -115,11 +116,12 @@ typedef enum logic {
 } pcSrc_e;
 
 
-typedef enum logic [1:0] {
+typedef enum logic [2:0] {
     RESULT_SRC_ALU,
     RESULT_SRC_MEM,
     RESULT_SRC_PC_PLUS_4,
-    RESULT_SRC_CSR
+    RESULT_SRC_CSR,
+    RESULT_SRC_FPU
 } resultSrc_e;
 
 
@@ -129,5 +131,18 @@ typedef enum logic [11:0] {
     CSR_INSTRET  = 12'hC02,
     CSR_INSTRETH = 12'hC82
 } csrAddr_e;
+
+
+typedef enum logic {
+    RF_SEL_INT,
+    RF_SEL_FP
+} rfSel_e;
+
+
+typedef enum logic [1:0] {
+    FPU_NOP,
+    FPU_ADD,
+    FPU_SUB
+} fpuCtrl_e;
 
 `endif // TYPES_SVH

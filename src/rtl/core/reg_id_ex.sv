@@ -6,6 +6,9 @@ module reg_id_ex(
     input  logic        flush,
 
     input  logic        rf_wen_i,
+    input  logic        fp_rf_wen_i,
+    input  rfSel_e      rs1_sel_i,
+    input  rfSel_e      rs2_sel_i,
     input  logic        mem_ceb_i,
     input  logic        mem_wen_i,
     input  logic        jump_i,
@@ -14,6 +17,7 @@ module reg_id_ex(
     input  aluCtrl_e    alu_ctrl_i,
     input  aluSrc1_e    alu_src1_i,
     input  aluSrc2_e    alu_src2_i,
+    input  fpuCtrl_e    fpu_ctrl_i,
     input  lsuCtrl_e    lsu_ctrl_i,
     input  resultSrc_e  result_src_i,
     input  logic [31:0] pc_i,
@@ -28,6 +32,9 @@ module reg_id_ex(
     input  logic [11:0] csr_addr_i,
 
     output logic        rf_wen_o,
+    output logic        fp_rf_wen_o,
+    output rfSel_e      rs1_sel_o,
+    output rfSel_e      rs2_sel_o,
     output logic        mem_ceb_o,
     output logic        mem_wen_o,
     output logic        jump_o,
@@ -36,6 +43,7 @@ module reg_id_ex(
     output aluCtrl_e    alu_ctrl_o,
     output aluSrc1_e    alu_src1_o,
     output aluSrc2_e    alu_src2_o,
+    output fpuCtrl_e    fpu_ctrl_o,
     output lsuCtrl_e    lsu_ctrl_o,
     output resultSrc_e  result_src_o,
     output logic [31:0] pc_o,
@@ -53,6 +61,9 @@ module reg_id_ex(
 always_ff @(posedge clk or posedge rst) begin
     if (rst) begin
         rf_wen_o          <= 1'b0;
+        fp_rf_wen_o       <= 1'b0;
+        rs1_sel_o         <= RF_SEL_INT;
+        rs2_sel_o         <= RF_SEL_INT;
         mem_ceb_o         <= 1'b0;
         mem_wen_o         <= 1'b0;
         jump_o            <= 1'b0;
@@ -61,6 +72,7 @@ always_ff @(posedge clk or posedge rst) begin
         alu_ctrl_o        <= ALU_NOP;
         alu_src1_o        <= ALU_SRC1_RS1;
         alu_src2_o        <= ALU_SRC2_RS2;
+        fpu_ctrl_o        <= FPU_NOP;
         lsu_ctrl_o        <= LSU_NOP;
         result_src_o      <= RESULT_SRC_ALU;
         pc_o              <= 32'd0;
@@ -75,6 +87,9 @@ always_ff @(posedge clk or posedge rst) begin
         csr_addr_o        <= 32'd0;
     end else if (flush) begin
         rf_wen_o          <= 1'b0;
+        fp_rf_wen_o       <= 1'b0;
+        rs1_sel_o         <= RF_SEL_INT;
+        rs2_sel_o         <= RF_SEL_INT;
         mem_ceb_o         <= 1'b0;
         mem_wen_o         <= 1'b0;
         jump_o            <= 1'b0;
@@ -83,6 +98,7 @@ always_ff @(posedge clk or posedge rst) begin
         alu_ctrl_o        <= ALU_NOP;
         alu_src1_o        <= ALU_SRC1_RS1;
         alu_src2_o        <= ALU_SRC2_RS2;
+        fpu_ctrl_o        <= FPU_NOP;
         lsu_ctrl_o        <= LSU_NOP;
         result_src_o      <= RESULT_SRC_ALU;
         pc_o              <= 32'd0;
@@ -97,6 +113,9 @@ always_ff @(posedge clk or posedge rst) begin
         csr_addr_o        <= 32'd0;
     end else begin
         rf_wen_o          <= rf_wen_i;
+        fp_rf_wen_o       <= fp_rf_wen_i;
+        rs1_sel_o         <= rs1_sel_i;
+        rs2_sel_o         <= rs2_sel_i;
         mem_ceb_o         <= mem_ceb_i;
         mem_wen_o         <= mem_wen_i;
         jump_o            <= jump_i;
@@ -105,6 +124,7 @@ always_ff @(posedge clk or posedge rst) begin
         alu_ctrl_o        <= alu_ctrl_i;
         alu_src1_o        <= alu_src1_i;
         alu_src2_o        <= alu_src2_i;
+        fpu_ctrl_o        <= fpu_ctrl_i;
         lsu_ctrl_o        <= lsu_ctrl_i;
         result_src_o      <= result_src_i;
         pc_o              <= pc_i;
