@@ -114,9 +114,11 @@ typedef enum logic [3:0] {
 } lsuCtrl_e;
 
 
-typedef enum logic {
+typedef enum logic [1:0] {
     PC_SRC_PC_PLUS_4,
-    PC_SRC_ALU_RESULT
+    PC_SRC_ALU_RESULT,
+    PC_SRC_BTB,
+    PC_SRC_MISPREDICT
 } pcSrc_e;
 
 

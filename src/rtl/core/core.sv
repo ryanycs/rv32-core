@@ -17,6 +17,8 @@
 `include "regfile.sv"
 `include "fp_regfile.sv"
 `include "fpu.sv"
+`include "bht.sv"
+`include "btb.sv"
 
 module core(
     input  logic        clk,
@@ -44,6 +46,11 @@ logic [31:0] pc_next;
 logic [31:0] if_pc;
 logic [31:0] if_pc_plus_4;
 logic [31:0] if_inst;
+// Branch predictor signal
+logic        bht_predict_taken;
+logic [31:0] btb_target;
+logic        btb_hit;
+logic        if_bp_taken;
 
 ////////////////////////////////////////
 // ID stage
@@ -86,6 +93,8 @@ aluSrc2_e    id_alu_src2;
 fpuCtrl_e    id_fpu_ctrl;
 lsuCtrl_e    id_lsu_ctrl;
 resultSrc_e  id_result_src;
+// Branch predictor signal
+logic        id_bp_taken;
 
 ////////////////////////////////////////
 // EX stage
@@ -130,6 +139,8 @@ aluSrc2_e    ex_alu_src2;
 fpuCtrl_e    ex_fpu_ctrl;
 lsuCtrl_e    ex_lsu_ctrl;
 resultSrc_e  ex_result_src;
+// Branch predictor signal
+logic        ex_bp_taken;
 
 ////////////////////////////////////////
 // MEM stage
@@ -199,34 +210,84 @@ pc u_pc(
 assign if_pc_plus_4 = if_pc + 32'd4;
 assign imem_addr = if_pc;
 
-// Pipeline Register IF/ID
-reg_if_id u_if_id(
-    .clk        (clk),
-    .rst        (rst),
-    .stall      (stall_if_id),
-    .flush      (flush_if_id),
-    .pc_i       (if_pc),
-    .pc_plus_4_i(if_pc_plus_4),
-    .pc_o       (id_pc),
-    .pc_plus_4_o(id_pc_plus_4)
+// Branch History Table
+bht u_bht(
+    .clk            (clk),
+    .rst            (rst),
+    .pc_i           (if_pc),
+    .update_i       (ex_branch),
+    .update_taken_i (branch_taken),
+    .update_pc_i    (ex_pc),
+    .predict_taken_o(bht_predict_taken)
 );
 
-// PC select:
-//   - ALU_RESULT: if jump or branch taken in EX
-//   - PC + 4: otherwise
-assign pc_sel = (ex_jump | (ex_branch & branch_taken))
-                ? PC_SRC_ALU_RESULT : PC_SRC_PC_PLUS_4;
+// Branch Target Buffer
+btb u_btb(
+    .clk            (clk),
+    .rst            (rst),
+    .flush          (1'b0),
+    .pc_i           (if_pc),
+    .update_i       (ex_branch & branch_taken),
+    .update_pc_i    (ex_pc),
+    .update_target_i(ex_alu_result),
+    .target_o       (btb_target),
+    .hit_o          (btb_hit)
+);
+
+assign if_bp_taken = bht_predict_taken & btb_hit;
+
+// PC select: (in order of priority)
+//   - ALU_RESULT: jump or branch misprediction (predicted not taken but taken)
+//   - PC + 4 (EX): branch misprediction (predicted taken but not taken)
+//   - BTB: if branch predicted taken in IF
+//   - PC + 4 (IF): otherwise
+always_comb begin
+    if (ex_jump || (ex_branch && branch_taken && !ex_bp_taken)) begin
+        pc_sel = PC_SRC_ALU_RESULT;
+    end else if (ex_bp_taken && !branch_taken && ex_branch) begin
+        pc_sel = PC_SRC_MISPREDICT;
+    end else if (if_bp_taken) begin
+        pc_sel = PC_SRC_BTB;
+    end else begin
+        pc_sel = PC_SRC_PC_PLUS_4;
+    end
+end
 
 // Mux for next PC:
 //   - ALU result (branch/jump target in EX)
+//   - BTB (branch target in IF)
+//   - PC + 4 (EX)
 //   - PC + 4 (IF)
 always_comb begin
-    if (pc_sel == PC_SRC_ALU_RESULT) begin
-        pc_next = ex_alu_result & 32'hFFFFFFFE; // Ensure LSB is 0
-    end else begin
-        pc_next = if_pc_plus_4;
-    end
+    case (pc_sel)
+        PC_SRC_ALU_RESULT: begin
+            pc_next = ex_alu_result & 32'hFFFFFFFE; // Ensure LSB is 0
+        end
+        PC_SRC_BTB: begin
+            pc_next = btb_target;
+        end
+        PC_SRC_MISPREDICT: begin
+            pc_next = ex_pc_plus_4;
+        end
+        default: begin
+            pc_next = if_pc_plus_4;
+        end
+    endcase
 end
+
+// Pipeline Register IF/ID
+reg_if_id u_if_id(
+    .clk            (clk),
+    .rst            (rst),
+    .stall          (stall_if_id),
+    .flush          (flush_if_id),
+    .pc_i           (if_pc),
+    .pc_plus_4_i    (if_pc_plus_4),
+    .predict_taken_i(if_bp_taken),
+    .pc_o           (id_pc),
+    .pc_plus_4_o    (id_pc_plus_4),
+    .predict_taken_o(id_bp_taken)
+);
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -370,6 +431,7 @@ reg_id_ex u_id_ex(
     .rd_addr_i        (id_rd_addr),
     .csr_instret_inc_i(id_csr_instret_inc),
     .csr_addr_i       (id_csr_addr),
+    .predict_taken_i  (id_bp_taken),
     .rf_wen_o         (ex_rf_wen),
     .fp_rf_wen_o      (ex_fp_rf_wen),
     .rs1_sel_o        (ex_rs1_sel),
@@ -394,7 +456,8 @@ reg_id_ex u_id_ex(
     .rs2_addr_o       (ex_rs2_addr),
     .rd_addr_o        (ex_rd_addr),
     .csr_instret_inc_o(ex_csr_instret_inc),
-    .csr_addr_o       (ex_csr_addr)
+    .csr_addr_o       (ex_csr_addr),
+    .predict_taken_o  (ex_bp_taken)
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -514,7 +577,9 @@ hazard u_hazard(
     .id_rs2_addr_i  (id_rs2_addr),
     .ex_rd_addr_i   (ex_rd_addr),
     .ex_result_src_i(ex_result_src),
-    .pc_sel_i       (pc_sel),
+    .jump_i         (ex_jump),
+    .branch_taken_i (ex_branch & branch_taken),
+    .predict_taken_i(ex_bp_taken),
     .stall_pc_o     (stall_pc),
     .stall_if_id_o  (stall_if_id),
     .flush_if_id_o  (flush_if_id),
@@ -649,7 +714,7 @@ always_ff @(posedge clk) begin
         mem_opcode_type <= NOP;
         wb_opcode_type <= NOP;
     end else begin
-        ex_opcode_type <= id_opcode_type;
+        ex_opcode_type <= flush_id_ex ? NOP : id_opcode_type;
         mem_opcode_type <= ex_opcode_type;
         wb_opcode_type <= mem_opcode_type;
     end

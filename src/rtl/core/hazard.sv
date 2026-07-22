@@ -1,19 +1,22 @@
 `include "types.svh"
 
 module hazard(
-    input logic       [4:0] id_rs1_addr_i,
-    input logic       [4:0] id_rs2_addr_i,
-    input logic       [4:0] ex_rd_addr_i,
-    input resultSrc_e       ex_result_src_i,
-    input pcSrc_e           pc_sel_i,
+    input  logic [4:0] id_rs1_addr_i,
+    input  logic [4:0] id_rs2_addr_i,
+    input  logic [4:0] ex_rd_addr_i,
+    input  resultSrc_e ex_result_src_i,
+    input  logic       jump_i,
+    input  logic       branch_taken_i,
+    input  logic       predict_taken_i,
 
-    output logic            stall_pc_o,
-    output logic            stall_if_id_o,
-    output logic            flush_if_id_o,
-    output logic            flush_id_ex_o
+    output logic       stall_pc_o,
+    output logic       stall_if_id_o,
+    output logic       flush_if_id_o,
+    output logic       flush_id_ex_o
 );
 
 logic lw_stall;
+logic mispredict;
 
 // Load hazard
 assign lw_stall    = (ex_result_src_i == RESULT_SRC_MEM)
@@ -21,8 +24,11 @@ assign lw_stall    = (ex_result_src_i == RESULT_SRC_MEM)
 assign stall_pc_o    = lw_stall;
 assign stall_if_id_o = lw_stall;
 
-// Branch taken or load introduces a bubble
-assign flush_if_id_o = (pc_sel_i == PC_SRC_ALU_RESULT);
-assign flush_id_ex_o = lw_stall || (pc_sel_i == PC_SRC_ALU_RESULT);
+// Branch misprediction
+assign mispredict = branch_taken_i ^ predict_taken_i;
+
+// Branch taken, misprediction, or load introduces a bubble
+assign flush_if_id_o = mispredict || jump_i;
+assign flush_id_ex_o = lw_stall || mispredict || jump_i;
 
 endmodule

@@ -30,6 +30,7 @@ module reg_id_ex(
     input  logic [4:0]  rd_addr_i,
     input  logic        csr_instret_inc_i,
     input  logic [11:0] csr_addr_i,
+    input  logic        predict_taken_i,
 
     output logic        rf_wen_o,
     output logic        fp_rf_wen_o,
@@ -55,7 +56,8 @@ module reg_id_ex(
     output logic [4:0]  rs2_addr_o,
     output logic [4:0]  rd_addr_o,
     output logic        csr_instret_inc_o,
-    output logic [11:0] csr_addr_o
+    output logic [11:0] csr_addr_o,
+    output logic        predict_taken_o
 );
 
 always_ff @(posedge clk or posedge rst) begin
@@ -85,6 +87,7 @@ always_ff @(posedge clk or posedge rst) begin
         rd_addr_o         <= 5'd0;
         csr_instret_inc_o <= 1'b0;
         csr_addr_o        <= 32'd0;
+        predict_taken_o   <= 1'b0;
     end else if (flush) begin
         rf_wen_o          <= 1'b0;
         fp_rf_wen_o       <= 1'b0;
@@ -111,6 +114,7 @@ always_ff @(posedge clk or posedge rst) begin
         rd_addr_o         <= 5'd0;
         csr_instret_inc_o <= 1'b0;
         csr_addr_o        <= 32'd0;
+        predict_taken_o   <= 1'b0;
     end else begin
         rf_wen_o          <= rf_wen_i;
         fp_rf_wen_o       <= fp_rf_wen_i;
@@ -137,6 +141,7 @@ always_ff @(posedge clk or posedge rst) begin
         rd_addr_o         <= rd_addr_i;
         csr_instret_inc_o <= csr_instret_inc_i;
         csr_addr_o        <= csr_addr_i;
+        predict_taken_o   <= predict_taken_i;
     end
 end
 
