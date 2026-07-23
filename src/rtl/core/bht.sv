@@ -1,8 +1,7 @@
 // Branch History Table (BHT)
 
 module bht #(
-    parameter BHT_SIZE = 256,
-    parameter BHT_INDEX_WIDTH = $clog2(BHT_SIZE)
+    parameter SIZE = 256
 )(
     input  logic clk,
     input  logic rst,
@@ -16,19 +15,21 @@ module bht #(
     output logic predict_taken_o
 );
 
-logic [1:0] bht [BHT_SIZE-1:0];
-logic [BHT_INDEX_WIDTH-1:0] index, update_index;
+localparam INDEX_WIDTH = $clog2(SIZE);
+
+logic [1:0] bht [SIZE-1:0];
+logic [INDEX_WIDTH-1:0] index, update_index;
 
 // The last 2 bits is always 0, so we start from bit 2 for indexing
-assign index = pc_i[2 +: BHT_INDEX_WIDTH];
-assign update_index = update_pc_i[2 +: BHT_INDEX_WIDTH];
+assign index = pc_i[2 +: INDEX_WIDTH];
+assign update_index = update_pc_i[2 +: INDEX_WIDTH];
 
 assign predict_taken_o = bht[index][1];
 
 // bht
 always_ff @(posedge clk or posedge rst) begin
     if (rst) begin
-        for (int i = 0; i < BHT_SIZE; i++) begin
+        for (int i = 0; i < SIZE; i++) begin
             bht[i] <= 2'b00;
         end
     end else begin
