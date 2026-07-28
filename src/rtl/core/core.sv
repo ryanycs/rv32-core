@@ -307,15 +307,25 @@ always_ff @(posedge clk or posedge rst) begin
     end
 end
 
+// flag to indicate reset has been deasserted
+logic rst_flag;
+always_ff @(posedge clk or posedge rst) begin
+    if (rst) begin
+        rst_flag <= 1'b0;
+    end else begin
+        rst_flag <= 1'b1;
+    end
+end
+
 // Mux for instruction
 //   - flush
 //      - To avoid fetching UNKNOWN value form IMEM,
-//        flush the instruction after reset (if_pc == 32'd0)
+//        flush the instruction after reset
 //   - stall
 //   - instruction from IMEM
 always_comb begin
-    if (flush_if_id_s1 || if_pc == 32'd0) begin
-        id_inst = 32'd0;
+    if (flush_if_id_s1 || !rst_flag) begin
+        id_inst = '0;
     end else if (stall_if_id_s1) begin
         id_inst = id_inst_prev;
     end else begin
