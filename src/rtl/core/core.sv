@@ -17,8 +17,7 @@
 `include "regfile.sv"
 `include "fp_regfile.sv"
 `include "fpu.sv"
-`include "bht.sv"
-`include "btb.sv"
+`include "branch_predictor.sv"
 
 module core(
     input  logic        clk,
@@ -47,10 +46,8 @@ logic [31:0] if_pc;
 logic [31:0] if_pc_plus_4;
 logic [31:0] if_inst;
 // Branch predictor signal
-logic        bht_predict_taken;
-logic [31:0] btb_target;
-logic        btb_hit;
-logic        if_bp_taken;
+logic        if_predict_taken;
+logic [31:0] if_predict_addr;
 
 ////////////////////////////////////////
 // ID stage
@@ -86,6 +83,7 @@ logic        id_mem_ceb;
 logic        id_mem_wen;
 aluCtrl_e    id_alu_ctrl;
 logic        id_jump;
+logic        id_jalr;
 logic        id_branch;
 branchCtrl_e id_branch_ctrl;
 aluSrc1_e    id_alu_src1;
@@ -94,7 +92,8 @@ fpuCtrl_e    id_fpu_ctrl;
 lsuCtrl_e    id_lsu_ctrl;
 resultSrc_e  id_result_src;
 // Branch predictor signal
-logic        id_bp_taken;
+logic        id_predict_taken;
+logic [31:0] id_predict_addr;
 
 ////////////////////////////////////////
 // EX stage
@@ -132,6 +131,7 @@ logic        ex_mem_ceb;
 logic        ex_mem_wen;
 aluCtrl_e    ex_alu_ctrl;
 logic        ex_jump;
+logic        ex_jalr;
 logic        ex_branch;
 branchCtrl_e ex_branch_ctrl;
 aluSrc1_e    ex_alu_src1;
@@ -140,7 +140,8 @@ fpuCtrl_e    ex_fpu_ctrl;
 lsuCtrl_e    ex_lsu_ctrl;
 resultSrc_e  ex_result_src;
 // Branch predictor signal
-logic        ex_bp_taken;
+logic        ex_predict_taken;
+logic [31:0] ex_predict_addr;
 
 ////////////////////////////////////////
 // MEM stage
@@ -151,6 +152,7 @@ logic [31:0] mem_rs2_data;
 logic [31:0] mem_alu_result;
 logic [31:0] mem_fpu_result;
 logic [31:0] mem_mem_rdata;
+logic [31:0] mem_result;
 // Control signal
 logic        mem_rf_wen;
 logic        mem_fp_rf_wen;
@@ -192,6 +194,7 @@ logic stall_if_id_s1;
 logic flush_if_id;
 logic flush_if_id_s1;
 logic flush_id_ex;
+logic jump_mispredict;
 // }}}
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -210,63 +213,56 @@ pc u_pc(
 assign if_pc_plus_4 = if_pc + 32'd4;
 assign imem_addr = if_pc;
 
-// Branch History Table
-bht u_bht(
+branch_predictor u_predictor(
     .clk            (clk),
     .rst            (rst),
     .pc_i           (if_pc),
-    .update_i       (ex_branch),
-    .update_taken_i (branch_taken),
-    .update_pc_i    (ex_pc),
-    .predict_taken_o(bht_predict_taken)
-);
-
-// Branch Target Buffer
-btb u_btb(
-    .clk            (clk),
-    .rst            (rst),
-    .flush          (1'b0),
-    .pc_i           (if_pc),
-    .update_i       (ex_branch & branch_taken),
+    .jump_i         (ex_jump),
+    .jalr_i         (ex_jalr),
+    .branch_i       (ex_branch),
+    .rd_addr_i      (ex_rd_addr),
+    .rs1_addr_i     (ex_rs1_addr),
+    .branch_taken_i (branch_taken),
     .update_pc_i    (ex_pc),
     .update_target_i(ex_alu_result),
-    .target_o       (btb_target),
-    .hit_o          (btb_hit)
+    .predict_taken_o(if_predict_taken),
+    .target_o       (if_predict_addr)
 );
 
-assign if_bp_taken = bht_predict_taken & btb_hit;
-
 // PC select: (in order of priority)
-//   - ALU_RESULT: jump or branch misprediction (predicted not taken but taken)
-//   - PC + 4 (EX): branch misprediction (predicted taken but not taken)
-//   - BTB: if branch predicted taken in IF
-//   - PC + 4 (IF): otherwise
+//   - ALU_RESULT
+//   - PC + 4 (EX)
+//   - BTB
+//   - PC + 4 (IF)
 always_comb begin
-    if (ex_jump || (ex_branch && branch_taken && !ex_bp_taken)) begin
+    // Jump misprediction or branch misprediction (predicted not taken but taken)
+    if (jump_mispredict || (ex_branch && !ex_predict_taken && branch_taken)) begin
         pc_sel = PC_SRC_ALU_RESULT;
-    end else if (ex_bp_taken && !branch_taken && ex_branch) begin
-        pc_sel = PC_SRC_MISPREDICT;
-    end else if (if_bp_taken) begin
+
+    // Branch misprediction (predicted taken but not taken)
+    end else if (ex_branch && ex_predict_taken && !branch_taken) begin
+        pc_sel = PC_SRC_PC4_EX;
+
+    // Branch predict taken (BTB hit)
+    end else if (if_predict_taken) begin
         pc_sel = PC_SRC_BTB;
+
+    // Default: PC + 4
     end else begin
-        pc_sel = PC_SRC_PC_PLUS_4;
+        pc_sel = PC_SRC_PC4_IF;
     end
 end
 
-// Mux for next PC:
-//   - ALU result (branch/jump target in EX)
-//   - BTB (branch target in IF)
-//   - PC + 4 (EX)
-//   - PC + 4 (IF)
+// Mux for next PC
 always_comb begin
     case (pc_sel)
         PC_SRC_ALU_RESULT: begin
             pc_next = ex_alu_result & 32'hFFFFFFFE; // Ensure LSB is 0
         end
         PC_SRC_BTB: begin
-            pc_next = btb_target;
+            pc_next = if_predict_addr;
         end
-        PC_SRC_MISPREDICT: begin
+        PC_SRC_PC4_EX: begin
             pc_next = ex_pc_plus_4;
         end
         default: begin
@@ -283,10 +279,12 @@ reg_if_id u_if_id(
     .flush          (flush_if_id),
     .pc_i           (if_pc),
     .pc_plus_4_i    (if_pc_plus_4),
-    .predict_taken_i(if_bp_taken),
+    .predict_taken_i(if_predict_taken),
+    .predict_addr_i (if_predict_addr),
     .pc_o           (id_pc),
     .pc_plus_4_o    (id_pc_plus_4),
-    .predict_taken_o(id_bp_taken)
+    .predict_taken_o(id_predict_taken),
+    .predict_addr_o (id_predict_addr)
 );
 
 
@@ -358,6 +356,7 @@ control u_control(
     .mem_ceb_o        (id_mem_ceb),
     .mem_wen_o        (id_mem_wen),
     .jump_o           (id_jump),
+    .jalr_o           (id_jalr),
     .branch_o         (id_branch),
     .branch_ctrl_o    (id_branch_ctrl),
     .alu_ctrl_o       (id_alu_ctrl),
@@ -423,6 +422,7 @@ reg_id_ex u_id_ex(
     .mem_ceb_i        (id_mem_ceb),
     .mem_wen_i        (id_mem_wen),
     .jump_i           (id_jump),
+    .jalr_i           (id_jalr),
     .branch_i         (id_branch),
     .branch_ctrl_i    (id_branch_ctrl),
     .alu_ctrl_i       (id_alu_ctrl),
@@ -441,7 +441,8 @@ reg_id_ex u_id_ex(
     .rd_addr_i        (id_rd_addr),
     .csr_instret_inc_i(id_csr_instret_inc),
     .csr_addr_i       (id_csr_addr),
-    .predict_taken_i  (id_bp_taken),
+    .predict_taken_i  (id_predict_taken),
+    .predict_addr_i   (id_predict_addr),
     .rf_wen_o         (ex_rf_wen),
     .fp_rf_wen_o      (ex_fp_rf_wen),
     .rs1_sel_o        (ex_rs1_sel),
@@ -449,6 +450,7 @@ reg_id_ex u_id_ex(
     .mem_ceb_o        (ex_mem_ceb),
     .mem_wen_o        (ex_mem_wen),
     .jump_o           (ex_jump),
+    .jalr_o           (ex_jalr),
     .branch_o         (ex_branch),
     .branch_ctrl_o    (ex_branch_ctrl),
     .alu_ctrl_o       (ex_alu_ctrl),
@@ -467,7 +469,8 @@ reg_id_ex u_id_ex(
     .rd_addr_o        (ex_rd_addr),
     .csr_instret_inc_o(ex_csr_instret_inc),
     .csr_addr_o       (ex_csr_addr),
-    .predict_taken_o  (ex_bp_taken)
+    .predict_taken_o  (ex_predict_taken),
+    .predict_addr_o   (ex_predict_addr)
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -476,7 +479,7 @@ reg_id_ex u_id_ex(
 
 // Mux for forwarding rs1 data:
 //   - rs1 (EX)
-//   - ALU result (MEM)
+//   - ALU result / PC + 4 (MEM)
 //   - FPU result (MEM)
 //   - write-back data (WB)
 always_comb begin
@@ -484,8 +487,8 @@ always_comb begin
         FORWARD_NONE: begin
             ex_rs1_data_fwd = ex_rs1_data;
         end
-        FORWARD_FROM_MEM_ALU: begin
-            ex_rs1_data_fwd = mem_alu_result;
+        FORWARD_FROM_MEM: begin
+            ex_rs1_data_fwd = mem_result;
         end
         FORWARD_FROM_MEM_FPU: begin
             ex_rs1_data_fwd = mem_fpu_result;
@@ -512,7 +515,7 @@ end
 
 // Mux for forwarding rs2 data:
 //   - rs2 (EX)
-//   - ALU result (MEM)
+//   - ALU result / PC + 4 (MEM)
 //   - FPU result (MEM)
 //   - write-back data (WB)
 always_comb begin
@@ -520,8 +523,8 @@ always_comb begin
         FORWARD_NONE: begin
             ex_rs2_data_fwd = ex_rs2_data;
         end
-        FORWARD_FROM_MEM_ALU: begin
-            ex_rs2_data_fwd = mem_alu_result;
+        FORWARD_FROM_MEM: begin
+            ex_rs2_data_fwd = mem_result;
         end
         FORWARD_FROM_MEM_FPU: begin
             ex_rs2_data_fwd = mem_fpu_result;
@@ -583,17 +586,21 @@ forwarding u_forwarding(
 );
 
 hazard u_hazard(
-    .id_rs1_addr_i  (id_rs1_addr),
-    .id_rs2_addr_i  (id_rs2_addr),
-    .ex_rd_addr_i   (ex_rd_addr),
-    .ex_result_src_i(ex_result_src),
-    .jump_i         (ex_jump),
-    .branch_taken_i (ex_branch & branch_taken),
-    .predict_taken_i(ex_bp_taken),
-    .stall_pc_o     (stall_pc),
-    .stall_if_id_o  (stall_if_id),
-    .flush_if_id_o  (flush_if_id),
-    .flush_id_ex_o  (flush_id_ex)
+    .id_rs1_addr_i    (id_rs1_addr),
+    .id_rs2_addr_i    (id_rs2_addr),
+    .ex_rd_addr_i     (ex_rd_addr),
+    .ex_result_src_i  (ex_result_src),
+    .jump_i           (ex_jump),
+    .branch_i         (ex_branch),
+    .branch_taken_i   (branch_taken),
+    .alu_result_i     (ex_alu_result),
+    .predict_taken_i  (ex_predict_taken),
+    .predict_addr_i   (ex_predict_addr),
+    .jump_mispredict_o(jump_mispredict),
+    .stall_pc_o       (stall_pc),
+    .stall_if_id_o    (stall_if_id),
+    .flush_if_id_o    (flush_if_id),
+    .flush_id_ex_o    (flush_id_ex)
 );
 
 csr u_csr(
@@ -675,6 +682,20 @@ reg_mem_wb u_mem_wb(
     .csr_rdata_o (wb_csr_rdata)
 );
 
+// Mux for forwarding MEM data
+//   - PC + 4 (for JAL/JALR)
+//   - ALU result
+always_comb begin
+    case (mem_result_src)
+        RESULT_SRC_PC4: begin
+            mem_result = mem_pc_plus_4;
+        end
+        default: begin
+            mem_result = mem_alu_result;
+        end
+    endcase
+end
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Write Back
@@ -688,7 +709,7 @@ reg_mem_wb u_mem_wb(
 //   - CSR read data
 always_comb begin
     case (wb_result_src)
-        RESULT_SRC_PC_PLUS_4: begin
+        RESULT_SRC_PC4: begin
             wb_result = wb_pc_plus_4;
         end
         RESULT_SRC_ALU: begin

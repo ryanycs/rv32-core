@@ -3,21 +3,33 @@
 module control(
     input  opcodeType_e opcode_type_i,
 
+    // Register File
     output logic        rf_wen_o,
     output logic        fp_rf_wen_o,
     output rfSel_e      rf_rs1_sel_o,
     output rfSel_e      rf_rs2_sel_o,
+
+    // Memory
     output logic        mem_ceb_o,
     output logic        mem_wen_o,
+
+    // Branch
     output logic        jump_o,
+    output logic        jalr_o,
     output logic        branch_o,
     output branchCtrl_e branch_ctrl_o,
+
+    // ALU, FPU, LSU
     output aluCtrl_e    alu_ctrl_o,
     output aluSrc1_e    alu_src1_o,
     output aluSrc2_e    alu_src2_o,
     output fpuCtrl_e    fpu_ctrl_o,
     output lsuCtrl_e    lsu_ctrl_o,
+
+    // Result Source
     output resultSrc_e  result_src_o,
+
+    // CSR
     output logic        csr_instret_inc_o
 );
 
@@ -29,6 +41,7 @@ always_comb begin
     mem_ceb_o         = 1'b0;
     mem_wen_o         = 1'b0;
     jump_o            = 1'b0;
+    jalr_o            = 1'b0;
     branch_o          = 1'b0;
     branch_ctrl_o     = BRANCH_NOP;
     alu_ctrl_o        = ALU_NOP;
@@ -213,16 +226,17 @@ always_comb begin
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_PC;
             alu_src2_o   = ALU_SRC2_IMM;
-            result_src_o = RESULT_SRC_PC_PLUS_4;
+            result_src_o = RESULT_SRC_PC4;
         end
 
         JALR: begin
             rf_wen_o     = 1'b1;
             jump_o       = 1'b1;
+            jalr_o       = 1'b1;
             alu_ctrl_o   = ALU_ADD;
             alu_src1_o   = ALU_SRC1_RS1;
             alu_src2_o   = ALU_SRC2_IMM;
-            result_src_o = RESULT_SRC_PC_PLUS_4;
+            result_src_o = RESULT_SRC_PC4;
         end
 
         BEQ: begin

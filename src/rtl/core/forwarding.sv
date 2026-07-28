@@ -23,7 +23,7 @@ always_comb begin
     if (rs1_sel_ex_i == RF_SEL_INT) begin
         if ( (rs1_addr_ex_i == rd_addr_mem_i && rf_wen_mem_i) && rs1_addr_ex_i != 5'd0) begin
             // Forward from MEM stage
-            forward_a_o = FORWARD_FROM_MEM_ALU;
+            forward_a_o = FORWARD_FROM_MEM;
         end else if ( (rs1_addr_ex_i == rd_addr_wb_i && rf_wen_wb_i) && rs1_addr_ex_i != 5'd0) begin
             // Forward from WB stage
             forward_a_o = FORWARD_FROM_WB;
@@ -50,7 +50,7 @@ always_comb begin
     if (rs2_sel_ex_i == RF_SEL_INT) begin
         if ( (rs2_addr_ex_i == rd_addr_mem_i && rf_wen_mem_i) && rs2_addr_ex_i != 5'd0) begin
             // Forward from MEM stage
-            forward_b_o = FORWARD_FROM_MEM_ALU;
+            forward_b_o = FORWARD_FROM_MEM;
         end else if ( (rs2_addr_ex_i == rd_addr_wb_i && rf_wen_wb_i) && rs2_addr_ex_i != 5'd0) begin
             // Forward from WB stage
             forward_b_o = FORWARD_FROM_WB;

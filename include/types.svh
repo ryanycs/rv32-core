@@ -96,7 +96,7 @@ typedef enum logic [2:0] {
 typedef enum logic [1:0] {
     FORWARD_NONE,
     FORWARD_FROM_WB,
-    FORWARD_FROM_MEM_ALU,
+    FORWARD_FROM_MEM,
     FORWARD_FROM_MEM_FPU
 } forwardCtrl_e;
 
@@ -115,17 +115,17 @@ typedef enum logic [3:0] {
 
 
 typedef enum logic [1:0] {
-    PC_SRC_PC_PLUS_4,
+    PC_SRC_PC4_IF,
     PC_SRC_ALU_RESULT,
     PC_SRC_BTB,
-    PC_SRC_MISPREDICT
+    PC_SRC_PC4_EX
 } pcSrc_e;
 
 
 typedef enum logic [2:0] {
     RESULT_SRC_ALU,
     RESULT_SRC_MEM,
-    RESULT_SRC_PC_PLUS_4,
+    RESULT_SRC_PC4,
     RESULT_SRC_CSR,
     RESULT_SRC_FPU
 } resultSrc_e;

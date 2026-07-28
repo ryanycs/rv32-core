@@ -12,6 +12,7 @@ module reg_id_ex(
     input  logic        mem_ceb_i,
     input  logic        mem_wen_i,
     input  logic        jump_i,
+    input  logic        jalr_i,
     input  logic        branch_i,
     input  branchCtrl_e branch_ctrl_i,
     input  aluCtrl_e    alu_ctrl_i,
@@ -31,6 +32,7 @@ module reg_id_ex(
     input  logic        csr_instret_inc_i,
     input  logic [11:0] csr_addr_i,
     input  logic        predict_taken_i,
+    input  logic [31:0] predict_addr_i,
 
     output logic        rf_wen_o,
     output logic        fp_rf_wen_o,
@@ -39,6 +41,7 @@ module reg_id_ex(
     output logic        mem_ceb_o,
     output logic        mem_wen_o,
     output logic        jump_o,
+    output logic        jalr_o,
     output logic        branch_o,
     output branchCtrl_e branch_ctrl_o,
     output aluCtrl_e    alu_ctrl_o,
@@ -57,7 +60,8 @@ module reg_id_ex(
     output logic [4:0]  rd_addr_o,
     output logic        csr_instret_inc_o,
     output logic [11:0] csr_addr_o,
-    output logic        predict_taken_o
+    output logic        predict_taken_o,
+    output logic [31:0] predict_addr_o
 );
 
 always_ff @(posedge clk or posedge rst) begin
@@ -69,6 +73,7 @@ always_ff @(posedge clk or posedge rst) begin
         mem_ceb_o         <= 1'b0;
         mem_wen_o         <= 1'b0;
         jump_o            <= 1'b0;
+        jalr_o            <= 1'b0;
         branch_o          <= 1'b0;
         branch_ctrl_o     <= BRANCH_NOP;
         alu_ctrl_o        <= ALU_NOP;
@@ -88,6 +93,7 @@ always_ff @(posedge clk or posedge rst) begin
         csr_instret_inc_o <= 1'b0;
         csr_addr_o        <= 32'd0;
         predict_taken_o   <= 1'b0;
+        predict_addr_o    <= 32'd0;
     end else if (flush) begin
         rf_wen_o          <= 1'b0;
         fp_rf_wen_o       <= 1'b0;
@@ -96,6 +102,7 @@ always_ff @(posedge clk or posedge rst) begin
         mem_ceb_o         <= 1'b0;
         mem_wen_o         <= 1'b0;
         jump_o            <= 1'b0;
+        jalr_o            <= 1'b0;
         branch_o          <= 1'b0;
         branch_ctrl_o     <= BRANCH_NOP;
         alu_ctrl_o        <= ALU_NOP;
@@ -115,6 +122,7 @@ always_ff @(posedge clk or posedge rst) begin
         csr_instret_inc_o <= 1'b0;
         csr_addr_o        <= 32'd0;
         predict_taken_o   <= 1'b0;
+        predict_addr_o    <= 32'd0;
     end else begin
         rf_wen_o          <= rf_wen_i;
         fp_rf_wen_o       <= fp_rf_wen_i;
@@ -123,6 +131,7 @@ always_ff @(posedge clk or posedge rst) begin
         mem_ceb_o         <= mem_ceb_i;
         mem_wen_o         <= mem_wen_i;
         jump_o            <= jump_i;
+        jalr_o            <= jalr_i;
         branch_o          <= branch_i;
         branch_ctrl_o     <= branch_ctrl_i;
         alu_ctrl_o        <= alu_ctrl_i;
@@ -142,6 +151,7 @@ always_ff @(posedge clk or posedge rst) begin
         csr_instret_inc_o <= csr_instret_inc_i;
         csr_addr_o        <= csr_addr_i;
         predict_taken_o   <= predict_taken_i;
+        predict_addr_o    <= predict_addr_i;
     end
 end
 
