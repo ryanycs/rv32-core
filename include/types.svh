@@ -11,6 +11,8 @@ typedef enum logic [2:0] {
 
 
 typedef enum logic [5:0] {
+    NOP, // NOTE: This is not a real opcode, just a placeholder
+
     // R-Type (10 ops)
     ADD, SUB,
     AND, OR, XOR,
@@ -44,9 +46,7 @@ typedef enum logic [5:0] {
     FADD, FSUB,
 
     // Zicsr Extension
-    CSRRS,
-
-    NOP // Note: This is not a real opcode, just a placeholder
+    CSRRS
 } opcodeType_e;
 
 
@@ -94,10 +94,9 @@ typedef enum logic [2:0] {
 
 
 typedef enum logic [1:0] {
-    FORWARD_NONE,
-    FORWARD_FROM_WB,
-    FORWARD_FROM_MEM,
-    FORWARD_FROM_MEM_FPU
+    FWD_NONE,
+    FWD_FROM_WB,
+    FWD_FROM_MEM
 } forwardCtrl_e;
 
 
@@ -124,6 +123,7 @@ typedef enum logic [1:0] {
 
 typedef enum logic [2:0] {
     RESULT_SRC_ALU,
+    RESULT_SRC_MUL,
     RESULT_SRC_MEM,
     RESULT_SRC_PC4,
     RESULT_SRC_CSR,

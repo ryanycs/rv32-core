@@ -1,7 +1,7 @@
 // Branch History Table (BHT)
 
 module bht #(
-    parameter SIZE = 256
+    parameter SIZE = 32
 )(
     input  logic clk,
     input  logic rst,

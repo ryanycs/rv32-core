@@ -1,6 +1,7 @@
 `include "types.svh"
 
 `include "alu.sv"
+`include "mul.sv"
 `include "branch_comp.sv"
 `include "control.sv"
 `include "csr.sv"
@@ -70,10 +71,10 @@ logic [31:0] id_rs2_data;
 // Immediate generator
 immType_e    id_imm_type;
 logic [31:0] id_imm;
-// CSR signal
+// CSR
 logic [11:0] id_csr_addr;
 logic        id_csr_instret_inc;
-// Control signal
+// Control
 opcodeType_e id_opcode_type;
 logic        id_rf_wen;
 logic        id_fp_rf_wen;
@@ -91,7 +92,7 @@ aluSrc2_e    id_alu_src2;
 fpuCtrl_e    id_fpu_ctrl;
 lsuCtrl_e    id_lsu_ctrl;
 resultSrc_e  id_result_src;
-// Branch predictor signal
+// Branch predictor
 logic        id_predict_taken;
 logic [31:0] id_predict_addr;
 
@@ -109,20 +110,24 @@ logic [31:0] ex_rs1_data;
 logic [31:0] ex_rs2_data;
 // Immediate
 logic [31:0] ex_imm;
-// Forwarded register data
+// Forwarded data
 logic [31:0] ex_rs1_data_fwd;
 logic [31:0] ex_rs2_data_fwd;
-// ALU signal
+// ALU
 logic [31:0] ex_alu_a;
 logic [31:0] ex_alu_b;
 logic [31:0] ex_alu_result;
-// FPU signal
+// MUL
+logic [31:0] ex_mul_result;
+// FPU
 logic [31:0] ex_fpu_result;
-// CSR signal
+// Result
+logic [31:0] ex_result;
+// CSR
 logic [11:0] ex_csr_addr;
 logic        ex_csr_instret_inc;
 logic [31:0] ex_csr_rdata;
-// Control signal
+// Control
 logic        ex_rf_wen;
 logic        ex_fp_rf_wen;
 rfSel_e      ex_rs1_sel;
@@ -139,7 +144,7 @@ aluSrc2_e    ex_alu_src2;
 fpuCtrl_e    ex_fpu_ctrl;
 lsuCtrl_e    ex_lsu_ctrl;
 resultSrc_e  ex_result_src;
-// Branch predictor signal
+// Branch predictor
 logic        ex_predict_taken;
 logic [31:0] ex_predict_addr;
 
@@ -149,18 +154,16 @@ logic [31:0] ex_predict_addr;
 logic [31:0] mem_pc_plus_4;
 logic [4:0]  mem_rd_addr;
 logic [31:0] mem_rs2_data;
-logic [31:0] mem_alu_result;
-logic [31:0] mem_fpu_result;
-logic [31:0] mem_mem_rdata;
 logic [31:0] mem_result;
-// Control signal
+logic [31:0] mem_result_fwd;
+// Control
 logic        mem_rf_wen;
 logic        mem_fp_rf_wen;
 logic        mem_mem_ceb;
 logic        mem_mem_wen;
 lsuCtrl_e    mem_lsu_ctrl;
 resultSrc_e  mem_result_src;
-// CSR signal
+// CSR
 logic [31:0] mem_csr_rdata;
 
 ////////////////////////////////////////
@@ -168,26 +171,25 @@ logic [31:0] mem_csr_rdata;
 ////////////////////////////////////////
 logic [31:0] wb_pc_plus_4;
 logic [4:0]  wb_rd_addr;
-logic [31:0] wb_alu_result;
-logic [31:0] wb_fpu_result;
 logic [31:0] wb_mem_rdata;
 logic [31:0] wb_result;
-// Control signal
+logic [31:0] wb_rf_wdata;
+// Control
 logic        wb_rf_wen;
 logic        wb_fp_rf_wen;
 resultSrc_e  wb_result_src;
-// CSR signal
+// CSR
 logic [31:0] wb_csr_rdata;
 
 ////////////////////////////////////////
 // Branch & Hazard signals
 ////////////////////////////////////////
-// Branch signal
+// Branch
 logic branch_taken;
-// Forwarding signals
+// Forwarding
 forwardCtrl_e forward_a;
 forwardCtrl_e forward_b;
-// Hazard signals
+// Hazard
 logic stall_pc;
 logic stall_if_id;
 logic stall_if_id_s1;
@@ -197,9 +199,9 @@ logic flush_id_ex;
 logic jump_mispredict;
 // }}}
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 // Instruction Fetch
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 
 // PC
 pc u_pc(
@@ -288,9 +290,9 @@ reg_if_id u_if_id(
 );
 
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 // Instruction Decode
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 
 // Delay 1 cycle to match the IMEM read latency
 always_ff @(posedge clk or posedge rst) begin
@@ -322,10 +324,12 @@ end
 //   - stall
 //   - instruction from IMEM
 always_comb begin
-    if (flush_if_id_s1 || !rst_flag) begin
+    if (!rst_flag) begin
         id_inst = '0;
     end else if (stall_if_id_s1) begin
         id_inst = id_inst_prev;
+    end else if (flush_if_id_s1) begin
+        id_inst = '0;
     end else begin
         id_inst = imem_rdata;
     end
@@ -377,7 +381,7 @@ regfile u_regfile(
     .rs2_data_o(rs2_data),
     .wen_i     (wb_rf_wen),
     .waddr_i   (wb_rd_addr),
-    .wdata_i   (wb_result)
+    .wdata_i   (wb_rf_wdata)
 );
 
 fp_regfile u_fp_regfile(
@@ -389,7 +393,7 @@ fp_regfile u_fp_regfile(
     .rs2_data_o(fp_rs2_data),
     .wen_i     (wb_fp_rf_wen),
     .waddr_i   (wb_rd_addr),
-    .wdata_i   (wb_result)
+    .wdata_i   (wb_rf_wdata)
 );
 
 // Mux for regfile
@@ -473,81 +477,39 @@ reg_id_ex u_id_ex(
     .predict_addr_o   (ex_predict_addr)
 );
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 // Execute
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 
-// Mux for forwarding rs1 data:
-//   - rs1 (EX)
-//   - ALU result / PC + 4 (MEM)
-//   - FPU result (MEM)
-//   - write-back data (WB)
+// Forwarding rs1 data
 always_comb begin
     case (forward_a)
-        FORWARD_NONE: begin
-            ex_rs1_data_fwd = ex_rs1_data;
-        end
-        FORWARD_FROM_MEM: begin
-            ex_rs1_data_fwd = mem_result;
-        end
-        FORWARD_FROM_MEM_FPU: begin
-            ex_rs1_data_fwd = mem_fpu_result;
-        end
-        FORWARD_FROM_WB: begin
-            ex_rs1_data_fwd = wb_result;
-        end
-        default: begin
-            ex_rs1_data_fwd = ex_rs1_data;
-        end
+        FWD_FROM_MEM: ex_rs1_data_fwd = mem_result_fwd;
+        FWD_FROM_WB:  ex_rs1_data_fwd = wb_rf_wdata;
+        default:      ex_rs1_data_fwd = ex_rs1_data;
     endcase
 end
 
-// Mux for ALU operand a:
+// ALU operand a:
 //   - rs1
 //   - PC
-always_comb begin
-    if (ex_alu_src1) begin
-        ex_alu_a = ex_pc;
-    end else begin
-        ex_alu_a = ex_rs1_data_fwd;
-    end
-end
+assign ex_alu_a = (ex_alu_src1 == ALU_SRC1_RS1)
+                  ? ex_rs1_data_fwd : ex_pc;
 
-// Mux for forwarding rs2 data:
-//   - rs2 (EX)
-//   - ALU result / PC + 4 (MEM)
-//   - FPU result (MEM)
-//   - write-back data (WB)
+// Forwarding rs2 data
 always_comb begin
     case (forward_b)
-        FORWARD_NONE: begin
-            ex_rs2_data_fwd = ex_rs2_data;
-        end
-        FORWARD_FROM_MEM: begin
-            ex_rs2_data_fwd = mem_result;
-        end
-        FORWARD_FROM_MEM_FPU: begin
-            ex_rs2_data_fwd = mem_fpu_result;
-        end
-        FORWARD_FROM_WB: begin
-            ex_rs2_data_fwd = wb_result;
-        end
-        default: begin
-            ex_rs2_data_fwd = ex_rs2_data;
-        end
+        FWD_FROM_MEM: ex_rs2_data_fwd = mem_result_fwd;
+        FWD_FROM_WB:  ex_rs2_data_fwd = wb_rf_wdata;
+        default:      ex_rs2_data_fwd = ex_rs2_data;
     endcase
 end
 
-// Mux for ALU operand b:
+// ALU operand b:
 //   - rs2
 //   - immediate
-always_comb begin
-    if (ex_alu_src2) begin
-        ex_alu_b = ex_imm;
-    end else begin
-        ex_alu_b = ex_rs2_data_fwd;
-    end
-end
+assign ex_alu_b = (ex_alu_src2 == ALU_SRC2_RS2)
+                  ? ex_rs2_data_fwd : ex_imm;
 
 alu u_alu(
     .a_i   (ex_alu_a),
@@ -556,12 +518,29 @@ alu u_alu(
     .res_o (ex_alu_result)
 );
 
+mul u_mul(
+    .a_i   (ex_rs1_data_fwd),
+    .b_i   (ex_rs2_data_fwd),
+    .ctrl_i(ex_alu_ctrl),
+    .res_o (ex_mul_result)
+);
+
 fpu u_fpu(
     .a_i   (ex_rs1_data_fwd),
     .b_i   (ex_rs2_data_fwd),
     .ctrl_i(ex_fpu_ctrl),
     .res_o (ex_fpu_result)
 );
+
+// Result
+always_comb begin
+    case (ex_result_src)
+        RESULT_SRC_ALU: ex_result = ex_alu_result;
+        RESULT_SRC_MUL: ex_result = ex_mul_result;
+        RESULT_SRC_FPU: ex_result = ex_fpu_result;
+        default:        ex_result = ex_alu_result;
+    endcase
+end
 
 branch_comp u_branch_comp(
     .a_i           (ex_rs1_data_fwd),
@@ -620,8 +599,7 @@ reg_ex_mem u_ex_mem(
     .mem_wen_i   (ex_mem_wen),
     .lsu_ctrl_i  (ex_lsu_ctrl),
     .result_src_i(ex_result_src),
-    .alu_result_i(ex_alu_result),
-    .fpu_result_i(ex_fpu_result),
+    .result_i    (ex_result),
     .pc_plus_4_i (ex_pc_plus_4),
     .rs2_data_i  (ex_rs2_data_fwd),
     .rd_addr_i   (ex_rd_addr),
@@ -632,8 +610,7 @@ reg_ex_mem u_ex_mem(
     .mem_wen_o   (mem_mem_wen),
     .lsu_ctrl_o  (mem_lsu_ctrl),
     .result_src_o(mem_result_src),
-    .alu_result_o(mem_alu_result),
-    .fpu_result_o(mem_fpu_result),
+    .result_o    (mem_result),
     .pc_plus_4_o (mem_pc_plus_4),
     .rs2_data_o  (mem_rs2_data),
     .rd_addr_o   (mem_rd_addr),
@@ -641,14 +618,14 @@ reg_ex_mem u_ex_mem(
 );
 
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 // Memory Access
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 
 lsu u_lsu(
     .clk        (clk),
     .ctrl_i     (mem_lsu_ctrl),
-    .addr_i     (mem_alu_result),
+    .addr_i     (mem_result),
     .ceb_i      (mem_mem_ceb),
     .wen_i      (mem_mem_wen),
     .wdata_i    (mem_rs2_data),
@@ -667,16 +644,14 @@ reg_mem_wb u_mem_wb(
     .rf_wen_i    (mem_rf_wen),
     .fp_rf_wen_i (mem_fp_rf_wen),
     .result_src_i(mem_result_src),
-    .alu_result_i(mem_alu_result),
-    .fpu_result_i(mem_fpu_result),
+    .result_i    (mem_result),
     .rd_addr_i   (mem_rd_addr),
     .pc_plus_4_i (mem_pc_plus_4),
     .csr_rdata_i (mem_csr_rdata),
     .rf_wen_o    (wb_rf_wen),
     .fp_rf_wen_o (wb_fp_rf_wen),
     .result_src_o(wb_result_src),
-    .alu_result_o(wb_alu_result),
-    .fpu_result_o(wb_fpu_result),
+    .result_o    (wb_result),
     .rd_addr_o   (wb_rd_addr),
     .pc_plus_4_o (wb_pc_plus_4),
     .csr_rdata_o (wb_csr_rdata)
@@ -684,55 +659,36 @@ reg_mem_wb u_mem_wb(
 
 // Mux for forwarding MEM data
 //   - PC + 4 (for JAL/JALR)
-//   - ALU result
+//   - ALU/MUL/FPU result
 always_comb begin
     case (mem_result_src)
-        RESULT_SRC_PC4: begin
-            mem_result = mem_pc_plus_4;
-        end
-        default: begin
-            mem_result = mem_alu_result;
-        end
+        RESULT_SRC_PC4: mem_result_fwd = mem_pc_plus_4;
+        default:        mem_result_fwd = mem_result;
     endcase
 end
 
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 // Write Back
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 
 // Mux for write-back data:
 //   - PC + 4 (for JAL/JALR)
-//   - ALU result
-//   - FPU result
 //   - Memory read data
 //   - CSR read data
+//   - ALU/MUL/FPU result
 always_comb begin
     case (wb_result_src)
-        RESULT_SRC_PC4: begin
-            wb_result = wb_pc_plus_4;
-        end
-        RESULT_SRC_ALU: begin
-            wb_result = wb_alu_result;
-        end
-        RESULT_SRC_FPU: begin
-            wb_result = wb_fpu_result;
-        end
-        RESULT_SRC_MEM: begin
-            wb_result = wb_mem_rdata;
-        end
-        RESULT_SRC_CSR: begin
-            wb_result = wb_csr_rdata;
-        end
-        default: begin
-            wb_result = 32'd0;
-        end
+        RESULT_SRC_PC4: wb_rf_wdata = wb_pc_plus_4;
+        RESULT_SRC_MEM: wb_rf_wdata = wb_mem_rdata;
+        RESULT_SRC_CSR: wb_rf_wdata = wb_csr_rdata;
+        default:        wb_rf_wdata = wb_result;
     endcase
 end
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 // Debug
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 
 `ifdef DEBUG
 opcodeType_e ex_opcode_type;
